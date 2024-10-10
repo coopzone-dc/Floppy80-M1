@@ -20,11 +20,10 @@
 	void RecordBusHistory(DWORD dwBus, BYTE byData);
 #endif
 
-#pragma GCC optimize ("O0")
-
 byte by_memory[0x8000];
-byte g_byModel1_RtcIntr;
-byte g_byGenerate_Intr;
+
+byte g_byGenerateRtcIntr;
+byte g_byGenerateFdcIntr;
 
 ///////////////////////////////////////////////////////////////////////////////
 // API documentions is located at
@@ -265,7 +264,8 @@ void __not_in_flash_func(service_memory)(void)
   } addr;
 
   ResetPioStateMachine();
-  g_byGenerate_Intr = false;
+  g_byGenerateRtcIntr = 0;
+  g_byGenerateFdcIntr = 0;
 
   while (1)
   {
@@ -313,21 +313,29 @@ void __not_in_flash_func(service_memory)(void)
           case 0x37E3:
             rdwr = 0x3F;
 
+            // byte g_byGenerateFdcIntr;
             if (g_FDC.status.byIntrRequest)
             {
               rdwr |= 0x40;
             }
 
-            if (g_byModel1_RtcIntr)
+            if (g_byGenerateRtcIntr == 1)
             {
               rdwr |= 0x80;
-              g_byModel1_RtcIntr = 0;
             }
 
-            if (g_byGenerate_Intr)
+            if (g_byGenerateRtcIntr)
             {
-              gpio_put(INT_PIN, 0); // deactivate intr
-              g_byGenerate_Intr = false;
+              --g_byGenerateRtcIntr;
+
+              if (g_byGenerateRtcIntr == 1)
+              {
+                gpio_put(INT_PIN, 1); // activate intr
+              }
+              else if (g_byGenerateRtcIntr == 0)
+              {
+                gpio_put(INT_PIN, 0); // deactivate intr
+              }
             }
 
             sio_hw->gpio_clr = 1 << DIR_PIN;        // B to A direction
@@ -351,6 +359,20 @@ void __not_in_flash_func(service_memory)(void)
           case 0x37ED: // Track register
           case 0x37EE: // Sector register
           case 0x37EF: // Data register
+            if (g_byGenerateRtcIntr)
+            {
+              --g_byGenerateRtcIntr;
+
+              if (g_byGenerateRtcIntr == 1)
+              {
+                gpio_put(INT_PIN, 1); // activate intr
+              }
+              else if (g_byGenerateRtcIntr == 0)
+              {
+                gpio_put(INT_PIN, 0); // deactivate intr
+              }
+            }
+
             rdwr = fdc_read(addr.w);
 
             sio_hw->gpio_clr = 1 << DIR_PIN;        // B to A direction

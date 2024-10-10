@@ -2,6 +2,8 @@
 #ifndef _H_DEFINES_
 #define _H_DEFINES_
 
+#pragma GCC optimize ("O0")
+
 #include <stdio.h>
 
 typedef signed char        	int8_t;
@@ -171,7 +173,9 @@ extern uint64_t g_nTimeDiff;
 
 extern uint8_t  sd_byCardInialized;
 
-extern byte     g_byGenerate_Intr;
+extern byte g_byGenerateFdcIntr;
+
+extern byte g_byGenerateRtcIntr;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,6 +12,10 @@
 #include "crc.h"
 #include "fdc.h"
 
+#define ENABLE_LOGGING 1
+
+byte g_bLogOpen = 1;
+
 // extern CpuType cpu;
 // extern int g_nModel;
 // extern byte g_byMemory[0x10000];
@@ -1179,8 +1183,7 @@ void FdcGenerateIntr(void)
 
 	g_FDC.byNmiStatusReg = 0x7F; // inverted state of all bits low except INTRQ
 
-	g_byGenerate_Intr = 1;
-    gpio_put(INT_PIN, 1); // deactivate intr
+	FdcSetFlag(eIntrRequest);
 }
 
 //-----------------------------------------------------------------------------
@@ -2302,71 +2305,71 @@ void GetCommandText(char* psz, int nMaxLen, BYTE byCmd)
 
 	if ((byCmd & 0xF0) == 0)         // 0000xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Restore\r\n");
+		strcpy(psz, "    FDC CMD: Restore\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x10) // 0001xxxx
 	{
-		sprintf_s(psz, nMaxLen, "    FDC CMD: SEEK 0x%02X, From 0x%02X\r\n", g_FDC.byData, g_FDC.byTrack);
+		sprintf(psz, "    FDC CMD: SEEK 0x%02X, From 0x%02X\r\n", g_FDC.byData, g_FDC.byTrack);
 	}
 	else if ((byCmd & 0xF0) == 0x20) // 0010xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Step, Do Not Update Track Register\r\n");
+		strcpy(psz, "    FDC CMD: Step, Do Not Update Track Register\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x30) // 0011xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Step, Update Track Register\r\n");
+		strcpy(psz, "    FDC CMD: Step, Update Track Register\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x40) // 0100xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Step In, Do Not Update Track Register\r\n");
+		strcpy(psz, "    FDC CMD: Step In, Do Not Update Track Register\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x50) // 0101xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Step In, Update Track Register\r\n");
+		strcpy(psz, "    FDC CMD: Step In, Update Track Register\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x60) // 0110xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Step Out, Do Not Update Track Register\r\n");
+		strcpy(psz, "    FDC CMD: Step Out, Do Not Update Track Register\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x70) // 0111xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Step Out, Update Track Register\r\n");
+		strcpy(psz, "    FDC CMD: Step Out, Update Track Register\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0x80) // 1000xxxx
 	{
-		sprintf_s(psz, nMaxLen, "    FDC CMD: DRV: 0x%02X TRK: 0x%02X RSEC: 0x%02X\r\n", g_FDC.byDriveSel, g_FDC.byTrack, g_FDC.bySector);
+		sprintf(psz, "    FDC CMD: DRV: 0x%02X TRK: 0x%02X RSEC: 0x%02X\r\n", g_FDC.byDriveSel, g_FDC.byTrack, g_FDC.bySector);
 	}
 	else if ((byCmd & 0xF0) == 0x90) // 1001xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: RSEC: Multiple Record\r\n");
+		strcpy(psz, "    FDC CMD: RSEC: Multiple Record\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0xA0) // 1010xxxx
 	{
-		sprintf_s(psz, nMaxLen, "    FDC CMD: WSEC: 0x%02X TRK: 0x%02X\r\n", g_FDC.bySector, g_FDC.byTrack);
+		sprintf(psz, "    FDC CMD: WSEC: 0x%02X TRK: 0x%02X\r\n", g_FDC.bySector, g_FDC.byTrack);
 	}
 	else if ((byCmd & 0xF0) == 0xB0) // 1011xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: WSEC: Multiple Record\r\n");
+		strcpy(psz, "    FDC CMD: WSEC: Multiple Record\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0xC0) // 1100xxxx
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Read Address\r\n");
+		strcpy(psz, "    FDC CMD: Read Address\r\n");
 	}
 	else if ((byCmd & 0xF0) == 0xD0) // 1101xxxx
 	{
-		sprintf_s(psz, nMaxLen, "    FDC CMD: Force Interrupt (0x%02X)\r\n", byCmd);
+		sprintf(psz, "    FDC CMD: Force Interrupt (0x%02X)\r\n", byCmd);
 	}
 	else if ((byCmd & 0xF0) == 0xE0) // 1110xxxx
 	{
-		sprintf_s(psz, nMaxLen, "    FDC CMD: RTRK: 0x%02X\r\n", g_FDC.byTrack);
+		sprintf(psz, "    FDC CMD: RTRK: 0x%02X\r\n", g_FDC.byTrack);
 	}
 	else if ((byCmd & 0xF0) == 0xF0) // 1110xxxx
 	{
-		sprintf_s(psz, nMaxLen, "    FDC CMD: WTRK: 0x%02X\r\n", g_FDC.byTrack);
+		sprintf(psz, "    FDC CMD: WTRK: 0x%02X\r\n", g_FDC.byTrack);
 	}
 	else
 	{
-		strcpy_s(psz, nMaxLen, "    FDC CMD: Unknown\r\n");
+		strcpy(psz, "    FDC CMD: Unknown\r\n");
 	}
 }
 #endif
@@ -2430,7 +2433,7 @@ void fdc_write(word addr, byte byData)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  sprintf_s(szBuf, sizeof(szBuf), "    FDC WRITE TRACK %02X\r\n", byData);
+			  sprintf(szBuf, "    FDC WRITE TRACK %02X\r\n", byData);
 			}
 #endif
 
@@ -2442,7 +2445,7 @@ void fdc_write(word addr, byte byData)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  sprintf_s(szBuf, sizeof(szBuf), "    FDC WRITE SECTOR %02X\r\n", byData);
+			  sprintf(szBuf, "    FDC WRITE SECTOR %02X\r\n", byData);
 			}
 #endif
 
@@ -2467,7 +2470,7 @@ void fdc_write(word addr, byte byData)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  sprintf_s(szBuf, sizeof(szBuf), "    FDC WRITE DATA %02X\r\n", byData);
+			  sprintf(szBuf, "    FDC WRITE DATA %02X\r\n", byData);
 			}
 #endif
 
@@ -2477,7 +2480,7 @@ void fdc_write(word addr, byte byData)
 #ifdef ENABLE_LOGGING
 	if (g_bLogOpen)
 	{
-		WriteLogFile(szBuf);
+		puts(szBuf);
 	}
 #endif
 }
@@ -2501,8 +2504,7 @@ byte fdc_read(word wAddr)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  sprintf_s(szBuf, sizeof(szBuf), "    FDC READ STATUS %02X\r\n", byData);
-				WriteLogFile(szBuf);
+				printf("    FDC READ STATUS %02X\r\n", byData);
 			}
 #endif
 
@@ -2522,8 +2524,7 @@ byte fdc_read(word wAddr)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  sprintf_s(szBuf, sizeof(szBuf), "    FDC READ TRACK %02X\r\n", byData);
-				WriteLogFile(szBuf);
+			  printf("    FDC READ TRACK %02X\r\n", byData);
 			}
 #endif
 
@@ -2535,8 +2536,7 @@ byte fdc_read(word wAddr)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  sprintf_s(szBuf, sizeof(szBuf), "    FDC READ SECTOR %02X\r\n", byData);
-				WriteLogFile(szBuf);
+			  printf("    FDC READ SECTOR %02X\r\n", byData);
 			}
 #endif
 
@@ -2572,8 +2572,7 @@ byte fdc_read(word wAddr)
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
 			{
-			  	sprintf_s(szBuf, sizeof(szBuf), "    FDC READ DATA %02X\r\n", byData);
-				WriteLogFile(szBuf);
+			  	printf("    FDC READ DATA %02X\r\n", byData);
 			}
 #endif
 
@@ -2595,12 +2594,9 @@ byte fdc_read(word wAddr)
 void fdc_write_drive_select(byte byData)
 {
 #ifdef ENABLE_LOGGING
-  	char szBuf[128];
-
 	if (g_bLogOpen)
 	{
-	  sprintf_s(szBuf, sizeof(szBuf), "    FDC  WR DRVSEL %02X\r\n", byData);
-	  WriteLogFile(szBuf);
+	  printf("    FDC  WR DRVSEL %02X\r\n", byData);
 	}
 #endif
 
@@ -2632,9 +2628,7 @@ byte fdc_read_nmi(void)
 #ifdef ENABLE_LOGGING
 	if (g_bLogOpen)
 	{
-	  char szBuf[128];
-	  sprintf_s(szBuf, sizeof(szBuf), "    FDC  RD NMI %02X\r\n", g_FDC.byNmiStatusReg);
-	  WriteLogFile(szBuf);
+	  printf("    FDC  RD NMI %02X\r\n", g_FDC.byNmiStatusReg);
 	}
 #endif
 
@@ -2649,9 +2643,7 @@ void fdc_write_nmi(byte byData)
 #ifdef ENABLE_LOGGING
 	if (g_bLogOpen)
 	{
-	  char szBuf[128];
-	  sprintf_s(szBuf, sizeof(szBuf), "    FDC  WR NMI %02X\r\n", byData);
-	  WriteLogFile(szBuf);
+	  printf("    FDC  WR NMI %02X\r\n", byData);
 	}
 #endif
 

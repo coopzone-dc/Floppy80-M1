@@ -16,7 +16,7 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-extern byte g_byModel1_RtcIntr;
+extern byte g_byGenerateRtcIntr;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,11 +66,13 @@ void InitVars(void)
 	g_nPrevTime = g_nTimeNow;
 
 	g_nRtcIntrCount = 0;
-	g_byModel1_RtcIntr = 0;
+	g_byGenerateRtcIntr = 0;
 
 	g_byMonitorReset = FALSE;
 	g_dwResetCount   = 0;
 	g_byResetFDC     = FALSE;
+
+	g_byGenerateRtcIntr = false;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -523,12 +525,10 @@ void UpdateCounters(void)
 
 	g_nRtcIntrCount += nDiff;
 
-	if (g_nRtcIntrCount > 25000) // 25mS / 40Hz RTC interrupt
+	if (g_nRtcIntrCount > 25000) // 25mS => 40Hz RTC interrupt
 	{
-		g_nRtcIntrCount -= 25000;
-		g_byModel1_RtcIntr = 1;
-		g_byGenerate_Intr = true;
-		gpio_put(INT_PIN, 1); // activate intr
+		g_nRtcIntrCount = 0;
+		g_byGenerateRtcIntr = 5;
 	}
 
 	if (g_FDC.dwWaitTimeoutCount > 0)
@@ -555,11 +555,11 @@ void UpdateCounters(void)
 
 		if (g_FDC.dwRotationCount < g_dwIndexTime)
 		{
-			g_FDC.stStatus.byIndex = 1;
+			FdcSetFlag(eIndex);
 		}
 		else
 		{
-			g_FDC.stStatus.byIndex = 0;
+			FdcClrFlag(eIndex);
 		}
 	}
 	else
