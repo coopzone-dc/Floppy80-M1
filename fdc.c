@@ -472,7 +472,9 @@ void FdcSetFlag(byte flag)
 
 		case eIntrRequest:
 			g_FDC.status.byIntrRequest = 1;
-			break;
+			g_byFdcIntrActive = true;
+		    gpio_put(INT_PIN, 1); // activate intr
+ 			break;
 
 	}
 
@@ -525,8 +527,8 @@ void FdcClrFlag(byte flag)
 
 		case eIntrRequest:
 			g_FDC.status.byIntrRequest = 0;
+			g_byFdcIntrActive = false;
 			break;
-
 	}
 
 	FdcUpdateStatus();

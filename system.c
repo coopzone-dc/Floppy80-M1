@@ -16,8 +16,6 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-extern byte g_byGenerateRtcIntr;
-
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 uint32_t SystemCoreClock = 133000000;
@@ -66,13 +64,13 @@ void InitVars(void)
 	g_nPrevTime = g_nTimeNow;
 
 	g_nRtcIntrCount = 0;
-	g_byGenerateRtcIntr = 0;
 
 	g_byMonitorReset = FALSE;
 	g_dwResetCount   = 0;
 	g_byResetFDC     = FALSE;
 
-	g_byGenerateRtcIntr = false;
+	g_byRtcIntrActive = false;
+	g_byFdcIntrActive = false;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -528,7 +526,8 @@ void UpdateCounters(void)
 	if (g_nRtcIntrCount > 25000) // 25mS => 40Hz RTC interrupt
 	{
 		g_nRtcIntrCount = 0;
-		g_byGenerateRtcIntr = 5;
+		g_byRtcIntrActive = true;
+	    gpio_put(INT_PIN, 1); // activate intr
 	}
 
 	if (g_FDC.dwWaitTimeoutCount > 0)

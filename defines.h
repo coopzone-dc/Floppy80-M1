@@ -173,9 +173,8 @@ extern uint64_t g_nTimeDiff;
 
 extern uint8_t  sd_byCardInialized;
 
-extern byte g_byGenerateFdcIntr;
-
-extern byte g_byGenerateRtcIntr;
+extern byte g_byRtcIntrActive;
+extern byte g_byFdcIntrActive;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

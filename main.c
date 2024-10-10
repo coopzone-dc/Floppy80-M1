@@ -22,8 +22,8 @@
 
 byte by_memory[0x8000];
 
-byte g_byGenerateRtcIntr;
-byte g_byGenerateFdcIntr;
+byte g_byRtcIntrActive;
+byte g_byFdcIntrActive;
 
 ///////////////////////////////////////////////////////////////////////////////
 // API documentions is located at
@@ -182,13 +182,6 @@ void InitGPIO(void)
 }
 
 //-----------------------------------------------------------------------------
-void __not_in_flash_func(fdc_isr)(void)
-{
-    irq_clear(PIO0_IRQ_0);
-    pio_interrupt_clear(g_pio, 0);
-}
-
-//-----------------------------------------------------------------------------
 
 void InitPIO(void)
 {
@@ -200,10 +193,6 @@ void InitPIO(void)
 
   // Start running the PIO program in the state machine
   pio_sm_set_enabled(g_pio, g_sm, true);
-
-  irq_set_exclusive_handler(PIO0_IRQ_0, fdc_isr);
-  irq_set_enabled(PIO0_IRQ_0, true);
-  pio_set_irq0_source_enabled(g_pio, pis_interrupt0, true);
 }
 
 void __not_in_flash_func(fast_gpio_set_mask)(uint32_t mask)
@@ -218,10 +207,10 @@ void __not_in_flash_func(fast_gpio_clr_mask)(uint32_t mask)
 
 ///////////////////////////////////////////////////////////////////////////////
 // restart pio code to release WAIT state
-void __not_in_flash_func(ResetPioStateMachine)(void)
+void __not_in_flash_func(ReleaseWait)(void)
 {
-  // empty fifo
-  pio_sm_clear_fifos(g_pio, g_sm);
+   // empty fifo
+   pio_sm_clear_fifos(g_pio, g_sm);
 
   /////////////////////////////////////////////////////////////////////////////////////////////
 	// restart the pio state machine at its first instruction (the address for which is g_offset)
@@ -246,9 +235,6 @@ void __not_in_flash_func(ResetPioStateMachine)(void)
 	//   1010  0000 1010 0001
 	pio_sm_exec(g_pio, g_sm, 0xA0A1);
 
-  // wait for first push on the state machine, lets us know it is running
-//  while (pio_sm_is_rx_fifo_empty(g_pio, g_sm));
-
   // remove the first push of the PIO SM
   pio_sm_get_blocking(g_pio, g_sm);
 }
@@ -256,16 +242,12 @@ void __not_in_flash_func(ResetPioStateMachine)(void)
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(service_memory)(void)
 {
-//  uint32_t mask = (1u << (PIO_FSTAT_RXEMPTY_LSB + g_sm));
   byte rdwr;
+  int  nHoldCount;
   union {
     byte b[2];
     word w;
   } addr;
-
-  ResetPioStateMachine();
-  g_byGenerateRtcIntr = 0;
-  g_byGenerateFdcIntr = 0;
 
   while (1)
   {
@@ -277,7 +259,18 @@ void __not_in_flash_func(service_memory)(void)
     //   31 => IN, RD, WR, OUT and MREQ are all high
     while (rdwr == 31) // wait while IN, RD, WR, OUT and MREQ are all high
     {
-      while (pio_sm_is_rx_fifo_empty(g_pio, g_sm));
+      nHoldCount = 0;
+
+      while (pio_sm_is_rx_fifo_empty(g_pio, g_sm))
+      {
+        ++nHoldCount;
+
+        if (nHoldCount > 500) // then wait might be stuck on
+        {
+          pio_sm_exec(g_pio, g_sm, 0xB042); // nop side 0
+        }
+      }
+
       rdwr = pio_sm_get(g_pio, g_sm);
     }
   
@@ -313,26 +306,17 @@ void __not_in_flash_func(service_memory)(void)
           case 0x37E3:
             rdwr = 0x3F;
 
-            // byte g_byGenerateFdcIntr;
             if (g_FDC.status.byIntrRequest)
             {
               rdwr |= 0x40;
             }
 
-            if (g_byGenerateRtcIntr == 1)
+            if (g_byRtcIntrActive)
             {
               rdwr |= 0x80;
-            }
+              g_byRtcIntrActive = false;
 
-            if (g_byGenerateRtcIntr)
-            {
-              --g_byGenerateRtcIntr;
-
-              if (g_byGenerateRtcIntr == 1)
-              {
-                gpio_put(INT_PIN, 1); // activate intr
-              }
-              else if (g_byGenerateRtcIntr == 0)
+              if (!g_byFdcIntrActive)
               {
                 gpio_put(INT_PIN, 0); // deactivate intr
               }
@@ -347,7 +331,7 @@ void __not_in_flash_func(service_memory)(void)
 
             sio_hw->gpio_togl = 1 << LED_PIN;
 
-            ResetPioStateMachine();
+            ReleaseWait();
 
             // turn bus around
             sio_hw->gpio_set = 1 << DATAB_OE_PIN; // disable data bus transciever
@@ -356,23 +340,14 @@ void __not_in_flash_func(service_memory)(void)
             break;
 
           case 0x37EC: // Cmd/Status register
-          case 0x37ED: // Track register
-          case 0x37EE: // Sector register
-          case 0x37EF: // Data register
-            if (g_byGenerateRtcIntr)
-            {
-              --g_byGenerateRtcIntr;
-
-              if (g_byGenerateRtcIntr == 1)
-              {
-                gpio_put(INT_PIN, 1); // activate intr
-              }
-              else if (g_byGenerateRtcIntr == 0)
+              if (!g_byRtcIntrActive)
               {
                 gpio_put(INT_PIN, 0); // deactivate intr
               }
-            }
 
+          case 0x37ED: // Track register
+          case 0x37EE: // Sector register
+          case 0x37EF: // Data register
             rdwr = fdc_read(addr.w);
 
             sio_hw->gpio_clr = 1 << DIR_PIN;        // B to A direction
@@ -384,7 +359,7 @@ void __not_in_flash_func(service_memory)(void)
 
             sio_hw->gpio_togl = 1 << LED_PIN;
 
-            ResetPioStateMachine();
+            ReleaseWait();
 
             // turn bus around
             sio_hw->gpio_set = 1 << DATAB_OE_PIN; // disable data bus transciever
@@ -393,7 +368,7 @@ void __not_in_flash_func(service_memory)(void)
             break;
 
           default:
-            ResetPioStateMachine();
+            ReleaseWait();
             break;
         }
       }
@@ -408,7 +383,7 @@ void __not_in_flash_func(service_memory)(void)
 
         sio_hw->gpio_togl = 1 << LED_PIN;
 
-        ResetPioStateMachine();
+        ReleaseWait();
 
         // turn bus around
         sio_hw->gpio_set = 1 << DATAB_OE_PIN; // disable data bus transciever
@@ -438,7 +413,7 @@ void __not_in_flash_func(service_memory)(void)
 
             fdc_write_drive_select(rdwr);
 
-            ResetPioStateMachine();
+            ReleaseWait();
             break;
 
           case 0x37EC: // Cmd/Status register
@@ -457,11 +432,11 @@ void __not_in_flash_func(service_memory)(void)
 
             fdc_write(addr.w, rdwr);
 
-            ResetPioStateMachine();
+            ReleaseWait();
             break;
  
           default:
-            ResetPioStateMachine();
+            ReleaseWait();
             break;
         }
       }
@@ -477,12 +452,12 @@ void __not_in_flash_func(service_memory)(void)
         by_memory[addr.w-0x8000] = sio_hw->gpio_in >> D0_PIN;
         sio_hw->gpio_set = 1 << DATAB_OE_PIN;
 
-        ResetPioStateMachine();
+        ReleaseWait();
       }
     }
     else
     {
-      ResetPioStateMachine();
+      ReleaseWait();
     }
   }
 }
@@ -511,5 +486,10 @@ int main()
   {
     UpdateCounters();
     FdcServiceStateMachine();
+
+    if (!g_byFdcIntrActive && !g_byRtcIntrActive)
+    {
+      gpio_put(INT_PIN, 0); // deactivate intr
+    }
   }   
 }
