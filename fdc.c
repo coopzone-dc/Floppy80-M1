@@ -349,7 +349,7 @@ void FdcUpdateStatus(void)
 		}
 	}
 	else if ((g_FDC.byCommandType == 2) ||	// Read Sector, Write Sector
-			     (g_FDC.byCommandType == 3))	  // Read Address, Read Track, Write Track
+			 (g_FDC.byCommandType == 3))	// Read Address, Read Track, Write Track
 	{
 		byStatus = 0;
 		
@@ -1525,14 +1525,14 @@ void FdcProcessWriteSectorCommand(void)
 	FdcReadSector(g_FDC.byDriveSel, nSide, g_FDC.byTrack, g_FDC.bySector);
 
 	FdcClrFlag(eDataRequest);
-	g_stSector.nSector           = g_FDC.bySector;
-	g_stSector.nSectorSize       = g_dtDives[nDrive].dmk.nSectorSize;
-	g_tdTrack.nFileOffset        = FdcGetTrackOffset(nDrive, nSide, g_FDC.byTrack);
-	g_tdTrack.pbyWritePtr        = g_tdTrack.byTrackData + g_stSector.nSectorDataOffset;
-	g_tdTrack.nWriteCount        = g_stSector.nSectorSize;
-	g_tdTrack.nWriteSize         = g_stSector.nSectorSize;	// number of byte to be transfered to the computer before
+	g_stSector.nSector     = g_FDC.bySector;
+	g_stSector.nSectorSize = g_dtDives[nDrive].dmk.nSectorSize;
+	g_tdTrack.nFileOffset  = FdcGetTrackOffset(nDrive, nSide, g_FDC.byTrack);
+	g_tdTrack.pbyWritePtr  = g_tdTrack.byTrackData + g_stSector.nSectorDataOffset;
+	g_tdTrack.nWriteCount  = g_stSector.nSectorSize;
+	g_tdTrack.nWriteSize   = g_stSector.nSectorSize;	// number of byte to be transfered to the computer before
 															// setting the Data Address Mark status bit (1 if Deleted Data)
-	g_FDC.nServiceState          = 0;
+	g_FDC.nServiceState    = 0;
 
 	if ((g_FDC.byCurCommand & 0x01) == 0)
 	{
@@ -1572,8 +1572,8 @@ void FdcProcessReadAddressCommand(void)
 	g_tdTrack.nReadSize  = 6;
 	g_tdTrack.nReadCount = 6;
 
-	g_FDC.nReadStatusCount       = 0;
-	g_FDC.dwStateCounter         = 1000;
+	g_FDC.nReadStatusCount = 0;
+	g_FDC.dwStateCounter   = 1000;
 	FdcClrFlag(eDataRequest);
 
 	// number of byte to be transfered to the computer before
@@ -1605,6 +1605,11 @@ void FdcProcessForceInterruptCommand(void)
 	g_tdTrack.nWriteSize = 0;
 	g_FDC.byIntrEnable   = g_FDC.byCurCommand & 0x0F;
 	memset(&g_FDC.status, 0, sizeof(g_FDC.status));
+
+    g_FDC.byCurCommand      = g_FDC.byCommandReg;
+    g_FDC.byCommandReceived = 0;
+    g_FDC.nProcessFunction  = psIdle;
+
 }
 
 //-----------------------------------------------------------------------------
@@ -1643,11 +1648,11 @@ void FdcProcessWriteTrackCommand(void)
 //-----------------------------------------------------------------------------
 void FdcProcessMount(void)
 {
-	g_FDC.byCommandType          = 2;
-	g_FDC.nReadStatusCount       = 0;
+	g_FDC.byCommandType    = 2;
+	g_FDC.nReadStatusCount = 0;
 	FdcClrFlag(eDataRequest);
-	g_FDC.nServiceState          = 0;
-	g_FDC.nProcessFunction       = psMountImage;
+	g_FDC.nServiceState    = 0;
+	g_FDC.nProcessFunction = psMountImage;
 
 	// Note: computer now writes the data register for each of the command data bytes.
 	//
@@ -1658,11 +1663,11 @@ void FdcProcessMount(void)
 //-----------------------------------------------------------------------------
 void FdcProcessOpenFile(void)
 {
-	g_FDC.byCommandType          = 2;
-	g_FDC.nReadStatusCount       = 0;
+	g_FDC.byCommandType    = 2;
+	g_FDC.nReadStatusCount = 0;
 	FdcClrFlag(eDataRequest);
-	g_FDC.nServiceState          = 0;
-	g_FDC.nProcessFunction       = psOpenFile;
+	g_FDC.nServiceState    = 0;
+	g_FDC.nProcessFunction = psOpenFile;
 
 	// Note: computer now writes the data register for each of the command data bytes.
 	//
@@ -1673,6 +1678,8 @@ void FdcProcessOpenFile(void)
 //-----------------------------------------------------------------------------
 void FdcProcessCommand(void)
 {
+	memset(&g_FDC.status, 0, sizeof(g_FDC.status));
+	FdcSetFlag(eBusy);
 	g_FDC.nServiceState     = 0;
 	g_FDC.nProcessFunction  = psIdle;
 	g_FDC.byCurCommand      = g_FDC.byCommandReg;
@@ -1754,7 +1761,6 @@ void FdcServiceReadSector(void)
 			}
 
 			FdcSetRecordType(g_FDC.byRecordMark);
-
 			FdcGenerateDRQ();
 			g_FDC.dwStateCounter = 5;
 			++g_FDC.nServiceState;
@@ -1766,10 +1772,10 @@ void FdcServiceReadSector(void)
 				break;
 			}
 
-			g_FDC.nReadStatusCount  = 0;
+			g_FDC.nReadStatusCount = 0;
 			++g_FDC.nServiceState;
 			FdcClrFlag(eBusy);
-			g_FDC.nProcessFunction  = psIdle;
+			g_FDC.nProcessFunction = psIdle;
 			break;
 	}
 }
@@ -2348,9 +2354,9 @@ void __not_in_flash_func(fdc_write)(word addr, byte byData)
 	switch (wReg)
 	{
 		case 0: // command register
-			g_FDC.byCommandReg    = byData;
-			g_FDC.byCommandType   = FdcGetCommandType(byData);
-			g_FDC.byNmiStatusReg  = 0xFF;
+			g_FDC.byCommandReg   = byData;
+			g_FDC.byCommandType  = FdcGetCommandType(byData);
+			g_FDC.byNmiStatusReg = 0xFF;
 
 			if (g_FDC.status.byIntrRequest)
 			{
@@ -2358,27 +2364,14 @@ void __not_in_flash_func(fdc_write)(word addr, byte byData)
 				FdcClrFlag(eIntrRequest);
 			}
 
-			memset(&g_FDC.status, 0, sizeof(g_FDC.status));
+    		g_FDC.byCommandReceived = 1;
 
-			wCom = g_FDC.byCommandReg & 0xF0;
+            wCom = 0;
 
-			if (wCom == 0xD0) // 0xD0 is Force Interrupt command
-			{
-				g_FDC.byCommandType     = 4;
-				g_tdTrack.nReadSize     = 0;
-				g_tdTrack.nReadCount    = 0;
-				g_tdTrack.nWriteSize    = 0;
-				g_FDC.byCurCommand      = g_FDC.byCommandReg;
-				g_FDC.byIntrEnable      = g_FDC.byCurCommand & 0x0F;
-				g_FDC.byCommandReceived = 0;
-				memset(&g_FDC.status, 0, sizeof(g_FDC.status));
-				g_FDC.nProcessFunction  = psIdle;
-			}
-			else
-			{
-				g_FDC.byCommandReceived = 1;
-				FdcSetFlag(eBusy);
-			}
+            while ((g_FDC.byCommandReceived == 1) && (wCom < 1000)) // wait for main task to recognize reception of command (don't wait forever)
+            {
+                ++wCom;
+            }
 
 #ifdef ENABLE_LOGGING
 			if (g_bLogOpen)
