@@ -165,8 +165,20 @@ uint32_t g_dwPrevTraceCycleCount = 0;
 char     g_szBootConfig[80];
 BYTE     g_byBootConfigModified;
 
-byte g_byFdcRequestBuffer[FDC_REQUEST_SIZE];
-byte g_byFdcResponseBuffer[FDC_RESPONSE_SIZE];
+#pragma pack(push)  /* push current alignment to stack */
+#pragma pack(1)     /* set alignment to 1-byte boundary */
+
+	#define FDC_CMD_SIZE 2
+
+	typedef struct {
+		byte cmd[FDC_CMD_SIZE];
+		byte buf[FDC_REQUEST_SIZE-FDC_CMD_SIZE];
+	} BufferType;
+
+	BufferType g_bFdcRequest;
+	BufferType g_bFdcResponse;
+
+#pragma pack(pop)   /* restore original alignment from stack */
 
 file*   g_fOpenFile;
 DIR     g_dj;				// Directory object
@@ -1136,8 +1148,8 @@ void FdcInit(void)
 {
 	int i;
 
-    memset(g_byFdcRequestBuffer, 0, sizeof(g_byFdcRequestBuffer));
-    memset(g_byFdcResponseBuffer, 0, sizeof(g_byFdcResponseBuffer));
+    memset(&g_bFdcRequest, 0, sizeof(g_bFdcRequest));
+    memset(&g_bFdcResponse, 0, sizeof(g_bFdcResponse));
 	memset(&g_FDC, 0, sizeof(g_FDC));
 	FdcSetFlag(eBusy);
 
@@ -2209,11 +2221,11 @@ void FdcServiceSendData(void)
 }
 
 //-----------------------------------------------------------------------------
-void SetResponseLength(byte* byResponse)
+void SetResponseLength(BufferType* bResponse)
 {
-	int i = strlen((char*)(byResponse+2));
-	byResponse[0] = i & 0xFF;
-	byResponse[1] = (i >> 8) & 0xFF;
+	int i = strlen((char*)(bResponse->buf));
+	bResponse->cmd[0] = i & 0xFF;
+	bResponse->cmd[1] = (i >> 8) & 0xFF;
 }
 
 //-----------------------------------------------------------------------------
@@ -2222,17 +2234,14 @@ void FdcProcessStatusRequest(void)
 	char szBuf[64];
 	int  i;
 	
-    memset(g_byFdcResponseBuffer, 0, sizeof(g_byFdcResponseBuffer));
+    memset(&g_bFdcResponse, 0, sizeof(g_bFdcResponse));
 
-	g_byFdcResponseBuffer[0] = 0;
-	g_byFdcResponseBuffer[1] = 0;
-
-	strcpy((char*)(g_byFdcResponseBuffer+2), "Pico FDC Version ");
-	strcat((char*)(g_byFdcResponseBuffer+2), g_pszVersion);
-	strcat((char*)(g_byFdcResponseBuffer+2), "\r");
-	strcat((char*)(g_byFdcResponseBuffer+2), "BootIni=");
-	strcat((char*)(g_byFdcResponseBuffer+2), g_szBootConfig);
-	strcat((char*)(g_byFdcResponseBuffer+2), "\r");
+	strcpy((char*)(g_bFdcResponse.buf), "Pico FDC Version ");
+	strcat((char*)(g_bFdcResponse.buf), g_pszVersion);
+	strcat((char*)(g_bFdcResponse.buf), "\r");
+	strcat((char*)(g_bFdcResponse.buf), "BootIni=");
+	strcat((char*)(g_bFdcResponse.buf), g_szBootConfig);
+	strcat((char*)(g_bFdcResponse.buf), "\r");
 
 	if (g_byBootConfigModified)
 	{
@@ -2247,7 +2256,7 @@ void FdcProcessStatusRequest(void)
 		
 		if (f == NULL)
 		{
-			strcat((char*)(g_byFdcResponseBuffer+2), "Unable to open specified ini file");
+			strcat((char*)(g_bFdcResponse.buf), "Unable to open specified ini file");
 		}
 		else
 		{
@@ -2257,8 +2266,8 @@ void FdcProcessStatusRequest(void)
 			{
 				if (nLen > 2)
 				{
-					strcat_s((char*)(g_byFdcResponseBuffer+2),  sizeof(g_byFdcResponseBuffer)-2, szLine);
-					strcat_s((char*)(g_byFdcResponseBuffer+2),  sizeof(g_byFdcResponseBuffer)-2, "\r");
+					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLine);
+					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, "\r");
 				}
 
 				nLen = FileReadLine(f, (BYTE*)szLine, 126);
@@ -2272,13 +2281,13 @@ void FdcProcessStatusRequest(void)
 		for (i = 0; i < MAX_DRIVES; ++i)
 		{
 			sprintf(szBuf, "%d: ", i);
-			strcat((char*)(g_byFdcResponseBuffer+2), szBuf);
-			strcat((char*)(g_byFdcResponseBuffer+2), g_dtDives[i].szFileName);
-			strcat((char*)(g_byFdcResponseBuffer+2), "\r");
+			strcat((char*)(g_bFdcResponse.buf), szBuf);
+			strcat((char*)(g_bFdcResponse.buf), g_dtDives[i].szFileName);
+			strcat((char*)(g_bFdcResponse.buf), "\r");
 		}
 	}
 
-	SetResponseLength(g_byFdcResponseBuffer);
+	SetResponseLength(&g_bFdcResponse);
 }
 
 //-----------------------------------------------------------------------------
@@ -2299,9 +2308,9 @@ void FdcProcessFindFirst(char* pszFilter)
 	g_nFindIndex = 0;
 	g_nFindCount = 0;
 
-    memset(g_byFdcResponseBuffer, 0, sizeof(g_byFdcResponseBuffer));
+    memset(&g_bFdcResponse, 0, sizeof(g_bFdcResponse));
 
-	strcpy((char*)(g_byFdcResponseBuffer+2), "too soon");
+	strcpy((char*)(g_bFdcResponse.buf), "too soon");
 
     memset(&g_dj, 0, sizeof(g_dj));
     memset(&g_fno, 0, sizeof(g_fno));
@@ -2313,8 +2322,8 @@ void FdcProcessFindFirst(char* pszFilter)
 
     if (FR_OK != fr)
 	{
-		strcpy((char*)(g_byFdcResponseBuffer+2), "No matching file found.");
-        SetResponseLength(g_byFdcResponseBuffer);
+		strcpy((char*)(g_bFdcResponse.buf), "No matching file found.");
+        SetResponseLength(&g_bFdcResponse);
         return;
     }
 
@@ -2345,17 +2354,17 @@ void FdcProcessFindFirst(char* pszFilter)
 	{
 		qsort(g_fiFindResults, g_nFindCount, sizeof(FILINFO), FdcFileListCmp);
 
-		sprintf((char*)(g_byFdcResponseBuffer+2), "%2d/%02d/%d %7d ",
+		sprintf((char*)(g_bFdcResponse.buf), "%2d/%02d/%d %7d ",
 				((g_fiFindResults[g_nFindIndex].fdate >> 5) & 0xF) + 1,
 				(g_fiFindResults[g_nFindIndex].fdate & 0xF) + 1,
 				(g_fiFindResults[g_nFindIndex].fdate >> 9) + 1980,
 				g_fiFindResults[g_nFindIndex].fsize);
-        strcat((char*)(g_byFdcResponseBuffer+2), (char*)g_fiFindResults[g_nFindIndex].fname);
+        strcat((char*)(g_bFdcResponse.buf), (char*)g_fiFindResults[g_nFindIndex].fname);
 
 		++g_nFindIndex;
 	}
 
-    SetResponseLength(g_byFdcResponseBuffer);
+    SetResponseLength(&g_bFdcResponse);
 }
 
 //-----------------------------------------------------------------------------
@@ -2364,27 +2373,86 @@ void FdcProcessFindNext(void)
     FRESULT fr = FR_OK;  /* Return value */
 	BYTE    bFound = FALSE;
 	
-    memset(g_byFdcResponseBuffer, 0, sizeof(g_byFdcResponseBuffer));
+    memset(&g_bFdcResponse, 0, sizeof(g_bFdcResponse));
 
 	if (g_nFindIndex < g_nFindCount)
 	{
-		sprintf((char*)(g_byFdcResponseBuffer+2), "%2d/%02d/%d %7d ",
+		sprintf((char*)(g_bFdcResponse.buf), "%2d/%02d/%d %7d ",
 				((g_fiFindResults[g_nFindIndex].fdate >> 5) & 0xF) + 1,
 				(g_fiFindResults[g_nFindIndex].fdate & 0xF) + 1,
 				(g_fiFindResults[g_nFindIndex].fdate >> 9) + 1980,
 				g_fiFindResults[g_nFindIndex].fsize);
-        strcat((char*)(g_byFdcResponseBuffer+2), (char*)g_fiFindResults[g_nFindIndex].fname);
+        strcat((char*)(g_bFdcResponse.buf), (char*)g_fiFindResults[g_nFindIndex].fname);
 
 		++g_nFindIndex;
 	}
 	
-    SetResponseLength(g_byFdcResponseBuffer);
+    SetResponseLength(&g_bFdcResponse);
+}
+
+//-----------------------------------------------------------------------------
+void FdcSaveBootCfg(char* pszIniFile)
+{
+	file* f;
+
+	f = FileOpen("boot.cfg", FA_WRITE | FA_CREATE_ALWAYS);
+	
+	if (f == NULL)
+	{
+		return;
+	}
+
+	g_byBootConfigModified = TRUE;
+
+	strcpy(g_szBootConfig, pszIniFile);
+	FileWrite(f, pszIniFile, strlen(pszIniFile));
+	FileClose(f);
+}
+
+//-----------------------------------------------------------------------------
+void FdcServiceMountImage(void)
+{
+	static int nIndex;
+	static int nSize;
+	char* psz;
+	int   nDrive;
+
+	// locate the drive number
+	psz = SkipBlanks((char*)g_bFdcResponse.buf);
+	nDrive = atoi(psz);
+
+	psz = SkipToBlank((char*)psz);
+
+	if (*psz != ' ')
+	{
+		return;
+	}
+
+	psz = SkipBlanks((char*)psz);
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES))
+	{
+		return;
+	}
+	
+	// if test if it is an ini file
+	if (stristr(g_bFdcResponse.buf, ".ini"))
+	{
+		FdcSaveBootCfg((char*)psz);
+	}
+	else if (FileExists((char*)psz))
+	{
+		strcpy(g_dtDives[nDrive].szFileName, (char*)psz);
+		FileClose(g_dtDives[nDrive].f);
+		g_dtDives[nDrive].f = NULL;
+		FdcMountDrive(nDrive);
+	}
 }
 
 //-----------------------------------------------------------------------------
 void FdcProcessRequest(void)
 {
-    switch (g_byFdcRequestBuffer[0])
+    switch (g_bFdcRequest.cmd[0])
     {
         case 0: // do nothing
             break;
@@ -2401,6 +2469,10 @@ void FdcProcessRequest(void)
             FdcProcessFindNext();
             break;
 
+		case 4: // Mount ini, dmk or hfe file
+			FdcServiceMountImage();
+			break;
+			
         case 0x80:
 			FdcProcessFindFirst(".INI");
             break;
@@ -2420,10 +2492,10 @@ void FdcServiceStateMachine(void)
 {
 	TestSdCardInsertion();
 
-    if (g_byFdcRequestBuffer[0] != 0)
+    if (g_bFdcRequest.cmd[0] != 0)
     {
         FdcProcessRequest();
-        g_byFdcRequestBuffer[0] = 0;
+        g_bFdcRequest.cmd[0] = 0;
         return;
     }
 
@@ -2749,7 +2821,15 @@ void __not_in_flash_func(fdc_request)(word addr, byte data)
     }
 
     addr -= FDC_REQUEST_ADDR_START;
-    g_byFdcRequestBuffer[addr] = data;
+
+	if (addr < FDC_CMD_SIZE)
+	{
+		g_bFdcRequest.cmd[addr] = data;
+	}
+	else
+	{
+	    g_bFdcRequest.buf[addr-FDC_CMD_SIZE] = data;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2761,5 +2841,13 @@ byte __not_in_flash_func(fdc_response)(word addr)
     }
 
     addr -= FDC_RESPONSE_ADDR_START;
-    return g_byFdcResponseBuffer[addr];
+
+	if (addr < FDC_CMD_SIZE)
+	{
+		return g_bFdcResponse.cmd[addr];
+	}
+	else
+	{
+		return g_bFdcResponse.buf[addr-FDC_CMD_SIZE];
+	}
 }
