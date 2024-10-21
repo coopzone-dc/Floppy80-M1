@@ -79,6 +79,7 @@
         "tusb.h": "c",
         "tusb_common.h": "c",
         "osal.h": "c",
-        "tusb_fifo.h": "c"
+        "tusb_fifo.h": "c",
+        "file.h": "c"
     }
 }

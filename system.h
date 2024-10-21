@@ -45,6 +45,8 @@ uint32_t CountUp(uint32_t nCount, uint32_t nAdjust);
 
 char* SkipBlanks(char* psz);
 char* SkipToBlank(char* psz);
+char* GetWord(char* psz, char* dest, int max_len);
+
 void  CopySectionName(char* pszSrc, char* pszDst, int nMaxLen);
 char* CopyLabelName(char* pszSrc, char* pszDst, int nMaxLen);
 void  CopyString(char* pszSrc, char* pszDst, int nMaxLen);
@@ -62,8 +64,9 @@ void  AddTrailingBackslash(char szFilePath[], int nMaxLen);
 	UINT64 time_us_64(void);
 #endif
 
-void   UpdateCounters(void);
-void   LoadIniFile(char* pszFileName);
+uint32_t GetTimeDiff(uint64_t nTime1, uint64_t nTime2);
+void     UpdateCounters(void);
+void     LoadIniFile(char* pszFileName);
 
 #endif
 

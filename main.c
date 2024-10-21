@@ -17,6 +17,7 @@
 #include "fdc.h"
 #include "system.h"
 #include "video.h"
+#include "cli.h"
 
 #if (ENABLE_TRACE_LOG == 1)
 	void RecordBusHistory(DWORD dwBus, BYTE byData);
@@ -183,110 +184,82 @@ void InitGPIO(void)
     gpio_set_dir(CD_PIN, GPIO_IN);
 }
 
-//-----------------------------------------------------------------------------
-void InitPIO(void)
-{
-    g_pio    = pio0;
-    g_sm     = pio_claim_unused_sm(g_pio, true);
-    g_offset = pio_add_program(g_pio, &fdc_program);
-
-    fdc_program_init(g_pio, g_sm, g_offset, &g_pio_config);
-
-    // Start running the PIO program in the state machine
-    pio_sm_set_enabled(g_pio, g_sm, true);
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // restart pio code to release WAIT state
 void __not_in_flash_func(ReleaseWait)(void)
 {
-    // empty fifo
-    pio_sm_clear_fifos(g_pio, g_sm);
+    gpio_put(WAIT_PIN, 0);
 
-    /////////////////////////////////////////////////////////////////////////////////////////////
-    // restart the pio state machine at its first instruction (the address for which is g_offset)
-    /////////////////////////////////////////////////////////////////////////////////////////////
-
-    // set x, g_offset
-    //   [3 bit opcode]      = 111
-    //   [5 bits = delay]    = 00000
-    //   [3 bits detination] = 001 = x
-    //   [5 bits data]       = g_offset
-    //   -------------------------------
-    //   1110  0000 0010 0000 + [offset]
-    pio_sm_exec(g_pio, g_sm, 0xE020 + g_offset);
-
-    // mov pc, x
-    //   [3 bit opcode]      = 101
-    //   [5 bits = delay]    = 00000
-    //   [3 bits detination] = 101 = pc
-    //   [2 bits Op]         = 00  = None
-    //   [3 bits Source]     = 001 = x
-    //   -------------------------------
-    //   1010  0000 1010 0001
-    pio_sm_exec(g_pio, g_sm, 0xA0A1);
-
-    // remove the first push of the PIO SM after IN, RD, WR, OUT and MREQ are all high
-    // indicating the end of a memory access cycle
-    pio_sm_get_blocking(g_pio, g_sm);
+    // wait for MREQ to go inactive
+    while (gpio_get(MREQ_PIN) == 0);
 }
 
 //-----------------------------------------------------------------------------
+// PIO States pushed into FIFO
+//-----------------------------------------------------------------------------
+//  1 - WAIT active, WR is low, state machine stalled
+//  2 - WAIT active, RD is low, state machine stalled
+// 31 - WAIT inactive, IN, RD, WR, OUT and MREQ are all high, waiting for MREQ to go low
 void __not_in_flash_func(service_memory)(void)
 {
-    byte rdwr;
-    byte byHoldCount;
+    byte operation;
+    byte data;
     union {
         byte b[2];
         word w;
     } addr;
 
+    gpio_put(WAIT_PIN, 0);
+
     while (1)
     {
-        rdwr = 31;
+        // wait for MREQ to go inactive
+        while (gpio_get(MREQ_PIN) == 0);
 
-        // rdwr = g_pio->rxf[g_sm];
-        //   1 => WR
-        //   2 => RD
-        //   31 => IN, RD, WR, OUT and MREQ are all high
-        do {
-            byHoldCount = 0;
+        // wait for MREQ to go active
+        while (gpio_get(MREQ_PIN) != 0);
 
-            do {
-                ++byHoldCount;
+        gpio_put(WAIT_PIN, 1);
 
-                if (byHoldCount > 250) // then wait might be stuck on
-                {
-                    // pio_sm_exec(g_pio, g_sm, 0xB042); // nop side 0
-                    g_pio->sm[g_sm].instr = 0xB042; // nop side 0
-                }
-            } while (pio_sm_is_rx_fifo_empty(g_pio, g_sm));
+        while ((gpio_get(RD_PIN) != 0) && (gpio_get(WR_PIN) != 0) && (gpio_get(MREQ_PIN) == 0));
 
-            // rdwr = pio_sm_get(g_pio, g_sm);
-            rdwr = g_pio->rxf[g_sm];
-        } while (rdwr == 31); // wait while IN, RD, WR, OUT and MREQ are all high
+        if (gpio_get(RD_PIN) == 0)
+        {
+            operation = opRead;
+        }
+        else if (gpio_get(WR_PIN) == 0)
+        {
+            operation = opWrite;
+        }
+        else
+        {
+            operation = opNop;
+        }
 
-        // read low address byte
-        sio_hw->gpio_clr = 1 << ADDRL_OE_PIN;
-        asm(
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        );
-        addr.b[0] = sio_hw->gpio_in >> D0_PIN;
-        sio_hw->gpio_set = 1 << ADDRL_OE_PIN;
+        if (operation != opNop)
+        {
+            // read low address byte
+            sio_hw->gpio_clr = 1 << ADDRL_OE_PIN;
+            asm(
+            "nop\n\t"
+            "nop\n\t"
+            "nop\n\t"
+            );
+            addr.b[0] = sio_hw->gpio_in >> D0_PIN;
+            sio_hw->gpio_set = 1 << ADDRL_OE_PIN;
 
-        // read high address byte
-        sio_hw->gpio_clr = 1 << ADDRH_OE_PIN;
-        asm(
-        "nop\n\t"
-        "nop\n\t"
-        "nop\n\t"
-        );
-        addr.b[1] = sio_hw->gpio_in >> D0_PIN;
-        sio_hw->gpio_set = 1 << ADDRH_OE_PIN;
+            // read high address byte
+            sio_hw->gpio_clr = 1 << ADDRH_OE_PIN;
+            asm(
+            "nop\n\t"
+            "nop\n\t"
+            "nop\n\t"
+            );
+            addr.b[1] = sio_hw->gpio_in >> D0_PIN;
+            sio_hw->gpio_set = 1 << ADDRH_OE_PIN;
+        }
 
-        if (rdwr == 2) // RD
+        if (operation == opRead)
         {
             if (addr.w < 0x8000) // RD from lower 32k memory
             {
@@ -296,16 +269,16 @@ void __not_in_flash_func(service_memory)(void)
                     case 0x37E1:
                     case 0x37E2:
                     case 0x37E3:
-                        rdwr = 0x3F;
+                        data = 0x3F;
 
                         if (g_FDC.status.byIntrRequest)
                         {
-                            rdwr |= 0x40;
+                            data |= 0x40;
                         }
 
                         if (g_byRtcIntrActive)
                         {
-                            rdwr |= 0x80;
+                            data |= 0x80;
                             g_byRtcIntrActive = false;
 
                             if (!g_byFdcIntrActive)
@@ -319,7 +292,7 @@ void __not_in_flash_func(service_memory)(void)
                         sio_hw->gpio_clr = 1 << DATAB_OE_PIN;   // enable data bus transciever
 
                         // put byte on data bus
-                        sio_hw->gpio_togl = (sio_hw->gpio_out ^ (rdwr << D0_PIN)) & (0xFF << D0_PIN);
+                        sio_hw->gpio_togl = (sio_hw->gpio_out ^ (data << D0_PIN)) & (0xFF << D0_PIN);
 
                         ReleaseWait();
 
@@ -338,14 +311,14 @@ void __not_in_flash_func(service_memory)(void)
                     case 0x37ED: // Track register
                     case 0x37EE: // Sector register
                     case 0x37EF: // Data register
-                        rdwr = fdc_read(addr.w);
+                        data = fdc_read(addr.w);
 
                         sio_hw->gpio_clr = 1 << DIR_PIN;        // B to A direction
                         sio_hw->gpio_oe_set = 0xFF << D0_PIN;   // make data pins (D0-D7) outputs
                         sio_hw->gpio_clr = 1 << DATAB_OE_PIN;   // enable data bus transciever
 
                         // put byte on data bus
-                        sio_hw->gpio_togl = (sio_hw->gpio_out ^ (rdwr << D0_PIN)) & (0xFF << D0_PIN);
+                        sio_hw->gpio_togl = (sio_hw->gpio_out ^ (data << D0_PIN)) & (0xFF << D0_PIN);
 
                         ReleaseWait();
 
@@ -359,13 +332,13 @@ void __not_in_flash_func(service_memory)(void)
                         if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP)) // fdc.cmd response area
                         {
 
-                            rdwr = fdc_response(addr.w);
+                            data = fdc_response(addr.w);
                             sio_hw->gpio_clr = 1 << DIR_PIN;        // B to A direction
                             sio_hw->gpio_oe_set = 0xFF << D0_PIN;   // make data pins (D0-D7) outputs
                             sio_hw->gpio_clr = 1 << DATAB_OE_PIN;   // enable data bus transciever
 
                             // put byte on data bus
-                            sio_hw->gpio_togl = (sio_hw->gpio_out ^ (rdwr << D0_PIN)) & (0xFF << D0_PIN);
+                            sio_hw->gpio_togl = (sio_hw->gpio_out ^ (data << D0_PIN)) & (0xFF << D0_PIN);
 
                             ReleaseWait();
 
@@ -397,7 +370,7 @@ void __not_in_flash_func(service_memory)(void)
                 sio_hw->gpio_set = 1 << DIR_PIN;      // A to B direction
             }
         }
-        else if (rdwr == 1) // WR
+        else if (operation == opWrite)
         {
             if ((addr.w >= 0x3C00) && (addr.w <= 0x3FFF))
             {
@@ -430,10 +403,10 @@ void __not_in_flash_func(service_memory)(void)
                         "nop\n\t"
                         "nop\n\t"
                         );
-                        rdwr = sio_hw->gpio_in >> D0_PIN;
+                        data = sio_hw->gpio_in >> D0_PIN;
                         sio_hw->gpio_set = 1 << DATAB_OE_PIN;
 
-                        fdc_write_drive_select(rdwr);
+                        fdc_write_drive_select(data);
 
                         ReleaseWait();
                         break;
@@ -449,10 +422,10 @@ void __not_in_flash_func(service_memory)(void)
                         "nop\n\t"
                         "nop\n\t"
                         );
-                        rdwr = sio_hw->gpio_in >> D0_PIN;
+                        data = sio_hw->gpio_in >> D0_PIN;
                         sio_hw->gpio_set = 1 << DATAB_OE_PIN;
 
-                        fdc_write(addr.w, rdwr);
+                        fdc_write(addr.w, data);
 
                         ReleaseWait();
                         break;
@@ -512,21 +485,17 @@ int main()
     FileSystemInit();
     FdcInit();
     InitVideo();
+    InitCli();
 
     // wait for reset to be released
     while (!gpio_get(SYSRES_PIN));
 
-    InitPIO();
     multicore_launch_core1(service_memory);
 
     while (true)
     {
         UpdateCounters();
         FdcServiceStateMachine();
-
-        if (tud_cdc_connected())
-        {
-            ServiceVideo();
-        }
+        ServiceCli();
     }
 }

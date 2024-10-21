@@ -304,6 +304,24 @@ char* SkipToBlank(char* psz)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
+char* GetWord(char* psz, char* dest, int max_len)
+{
+    int len = 0;
+
+    psz = SkipBlanks(psz);
+
+    while ((*psz != ' ') && (len < max_len))
+    {
+        *dest = *psz;
+        ++psz;
+        ++dest;
+        ++len;
+    }
+
+    return psz;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
 void CopySectionName(char* pszSrc, char* pszDst, int nMaxLen)
 {
 	int i = 0;
@@ -496,20 +514,26 @@ DWORD GetCycDuration(DWORD dwEndCount, DWORD dwStartCount)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+uint32_t GetTimeDiff(uint64_t nTime1, uint64_t nTime2)
+{
+	if (nTime1 >= nTime2)
+	{
+		return (uint32_t)(nTime1 - nTime2);
+	}
+	else
+	{
+		return (uint32_t)(0x100000000 - nTime2 + nTime1);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
 void UpdateCounters(void)
 {
 	uint32_t nDiff;
 
 	g_nTimeNow = time_us_64();
 
-	if (g_nTimeNow >= g_nPrevTime)
-	{
-		nDiff = (uint32_t)(g_nTimeNow - g_nPrevTime);
-	}
-	else
-	{
-		nDiff = (uint32_t)(0x100000000 - g_nPrevTime + g_nTimeNow);
-	}
+	nDiff = GetTimeDiff(g_nTimeNow, g_nPrevTime);
 
 	g_nPrevTime = g_nTimeNow;
 
