@@ -5,8 +5,10 @@
 
 #include "defines.h"
 #include "system.h"
-#include "cli.h"
 #include "file.h"
+#include "fdc.h"
+#include "video.h"
+#include "cli.h"
 
 uint64_t g_nCdcPrevTime;
 uint32_t g_nCdcConnectDuration;
@@ -18,6 +20,16 @@ int      g_nCommandLineIndex;
 
 static DIR     dj;				// Directory object
 static FILINFO fno;				// File information
+
+char szHelpText[] = {
+                        "\n"
+                        "help   - returns this message\n"
+                        "status - returns the current FDC status\n"
+                        "dir    - returns a directory listing of the root folder of the SD-Card\n"
+                        "         optionally include a filter.  For example dir .ini\n"
+                        "boot   - selects an ini file to be specified in the boot.cfg\n"
+                        "video  - returns a copy of the screen image\n"
+                    };
 
 void InitCli(void)
 {
@@ -62,11 +74,39 @@ void ProcessCommand(char* psz)
 
     psz = GetWord(psz, szCmd, sizeof(szCmd)-2);
 
+    if (stricmp(szCmd, "HELP") == 0)
+    {
+        puts(szHelpText);
+        return;
+    }
+
     if (stricmp(szCmd, "DIR") == 0)
     {
         psz = GetWord(psz, szParm1, sizeof(szParm1)-2);
         ListFiles(szParm1);
+        return;
     }
+
+    if (stricmp(szCmd, "BOOT") == 0)
+    {
+        psz = GetWord(psz, szParm1, sizeof(szParm1)-2);
+		FdcSaveBootCfg(szParm1);
+        return;
+    }
+
+    if (stricmp(szCmd, "STATUS") == 0)
+    {
+        FdcProcessStatusRequest(true);
+        return;
+    }
+
+    if (stricmp(szCmd, "VIDEO") == 0)
+    {
+        PrintVideo();
+        return;
+    }
+
+    puts("Unknown command");
 }
 
 void ServiceCli(void)
@@ -103,7 +143,6 @@ void ServiceCli(void)
         }
 
         printf("\nCMD> ");
-//        tud_cdc_n_write(CDC_ITF, prompt, strlen(prompt));
         g_bCdcPromptSent = true;
     }
 
@@ -126,6 +165,7 @@ void ServiceCli(void)
 
     if (c == '\r')
     {
+        puts(g_szCommandLine);
         ProcessCommand(g_szCommandLine);
         printf("\nCMD> ");
         g_nCommandLineIndex = 0;

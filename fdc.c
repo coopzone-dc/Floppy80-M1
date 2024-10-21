@@ -2353,19 +2353,29 @@ void SetResponseLength(BufferType* bResponse)
 }
 
 //-----------------------------------------------------------------------------
-void FdcProcessStatusRequest(void)
+void FdcProcessStatusRequest(byte print)
 {
 	char szBuf[64];
+	char szLineEnd[4];
 	int  i;
 	
+	if (print)
+	{
+		strcpy(szLineEnd, "\r\n");
+	}
+	else
+	{
+		strcpy(szLineEnd, "\n");
+	}
+
     memset(&g_bFdcResponse, 0, sizeof(g_bFdcResponse));
 
 	strcpy((char*)(g_bFdcResponse.buf), "Pico FDC Version ");
 	strcat((char*)(g_bFdcResponse.buf), g_pszVersion);
-	strcat((char*)(g_bFdcResponse.buf), "\r");
+	strcat((char*)(g_bFdcResponse.buf), szLineEnd);
 	strcat((char*)(g_bFdcResponse.buf), "BootIni=");
 	strcat((char*)(g_bFdcResponse.buf), g_szBootConfig);
-	strcat((char*)(g_bFdcResponse.buf), "\r");
+	strcat((char*)(g_bFdcResponse.buf), szLineEnd);
 
 	if (g_byBootConfigModified)
 	{
@@ -2391,7 +2401,7 @@ void FdcProcessStatusRequest(void)
 				if (nLen > 2)
 				{
 					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLine);
-					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, "\r");
+					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLineEnd);
 				}
 
 				nLen = FileReadLine(f, (BYTE*)szLine, 126);
@@ -2407,11 +2417,18 @@ void FdcProcessStatusRequest(void)
 			sprintf(szBuf, "%d: ", i);
 			strcat((char*)(g_bFdcResponse.buf), szBuf);
 			strcat((char*)(g_bFdcResponse.buf), g_dtDives[i].szFileName);
-			strcat((char*)(g_bFdcResponse.buf), "\r");
+			strcat((char*)(g_bFdcResponse.buf), szLineEnd);
 		}
 	}
 
-	SetResponseLength(&g_bFdcResponse);
+	if (print)
+	{
+		puts(g_bFdcResponse.buf);
+	}
+	else
+	{
+		SetResponseLength(&g_bFdcResponse);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2582,7 +2599,7 @@ void FdcProcessRequest(void)
             break;
 
         case 1: // put status in response buffer
-            FdcProcessStatusRequest();
+            FdcProcessStatusRequest(false);
             break;
 
         case 2: // find first file

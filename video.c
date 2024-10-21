@@ -163,3 +163,15 @@ void ServiceVideo(void)
             break;
     }
 }
+
+void PrintVideo(void)
+{
+    byte buf[VIDEO_NUM_COLS+1];
+    int  i;
+
+    for (i = 0; i < VIDEO_NUM_ROWS; ++i)
+    {
+        GetVideoLine(i, buf, sizeof(buf));
+        puts(buf);
+    }
+}

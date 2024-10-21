@@ -348,6 +348,9 @@ extern TrackType g_tdTrack;
 
 /* function prototypes ==========================================*/
 
+void FdcSaveBootCfg(char* pszIniFile);
+void FdcProcessStatusRequest(byte print);
+
 void LoadHfeTrack(file* pFile, int nTrack, int nSide, HfeDriveType* pdisk, TrackType* ptrack, BYTE* pbyTrackData, int nMaxLen);
 
 void FdcSetFlag(byte flag);

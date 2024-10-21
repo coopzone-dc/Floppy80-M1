@@ -7,5 +7,6 @@
 void InitVideo(void);
 void VideoWrite(word addr, byte ch);
 void ServiceVideo(void);
+void PrintVideo(void);
 
 #endif

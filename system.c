@@ -619,6 +619,7 @@ void UpdateCounters(void)
 			{
 				g_byMonitorReset = FALSE;
 				g_byResetFDC = 1;
+				FileCloseAll();
 			    multicore_reset_core1();
 			    system_reset();
 			}
