@@ -195,11 +195,6 @@ void __not_in_flash_func(ReleaseWait)(void)
 }
 
 //-----------------------------------------------------------------------------
-// PIO States pushed into FIFO
-//-----------------------------------------------------------------------------
-//  1 - WAIT active, WR is low, state machine stalled
-//  2 - WAIT active, RD is low, state machine stalled
-// 31 - WAIT inactive, IN, RD, WR, OUT and MREQ are all high, waiting for MREQ to go low
 void __not_in_flash_func(service_memory)(void)
 {
     byte operation;
