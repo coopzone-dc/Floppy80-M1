@@ -310,7 +310,7 @@ char* GetWord(char* psz, char* dest, int max_len)
 
     psz = SkipBlanks(psz);
 
-    while ((*psz != ' ') && (len < max_len))
+    while ((*psz != ' ') && (*psz != 0) && (len < max_len))
     {
         *dest = *psz;
         ++psz;
