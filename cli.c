@@ -107,6 +107,7 @@ void ProcessCommand(char* psz)
     }
 
     puts("Unknown command");
+    puts(szHelpText);
 }
 
 void ServiceCli(void)
@@ -153,22 +154,31 @@ void ServiceCli(void)
         return;
     }
 
-    if (g_nCommandLineIndex < sizeof(g_szCommandLine)-2)
-    {
-        if ((c != '\n') && (c != '\r'))
-        {
-            g_szCommandLine[g_nCommandLineIndex] = c;
-            ++g_nCommandLineIndex;
-            g_szCommandLine[g_nCommandLineIndex] = 0;
-        }
-    }
-
     if (c == '\r')
     {
-        puts(g_szCommandLine);
+        puts("");
         ProcessCommand(g_szCommandLine);
         printf("\nCMD> ");
         g_nCommandLineIndex = 0;
         g_szCommandLine[0] = 0;
+    }
+    else if (c == '\b') // backspace
+    {
+        if (g_nCommandLineIndex > 0)
+        {
+            --g_nCommandLineIndex;
+            g_szCommandLine[g_nCommandLineIndex] = 0;
+            printf("\b \b");
+        }
+    }
+    else if (g_nCommandLineIndex < sizeof(g_szCommandLine)-2)
+    {
+        if ((c != '\n') && (c != '\r'))
+        {
+            printf("%c", c);
+            g_szCommandLine[g_nCommandLineIndex] = c;
+            ++g_nCommandLineIndex;
+            g_szCommandLine[g_nCommandLineIndex] = 0;
+        }
     }
 }
