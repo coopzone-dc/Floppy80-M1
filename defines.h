@@ -109,6 +109,16 @@ typedef unsigned long      	dword;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#define get_gpio_data_byte() (sio_hw->gpio_in >> D0_PIN)
+#define get_gpio(gpio)       (sio_hw->gpio_in & (1u << gpio))
+#define set_gpio(gpio)        sio_hw->gpio_set = 1u << gpio
+#define clr_gpio(gpio)        sio_hw->gpio_clr = 1u << gpio
+#define set_bus_as_output()   sio_hw->gpio_oe_set = 0xFF << D0_PIN
+#define set_bus_as_input()    sio_hw->gpio_oe_clr = 0xFF << D0_PIN
+#define put_byte_on_bus(data) sio_hw->gpio_togl = (sio_hw->gpio_out ^ (data << D0_PIN)) & (0xFF << D0_PIN)
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Low Power Timer Overflow Rates in Hz
 #define TIMER_OVERFLOW_RATE 2000
 

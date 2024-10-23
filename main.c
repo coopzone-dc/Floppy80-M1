@@ -181,58 +181,6 @@ void InitGPIO(void)
 }
 
 //-----------------------------------------------------------------------------
-static inline byte get_gpio_data_byte(void)
-{
-    return sio_hw->gpio_in >> D0_PIN;
-}
-
-//-----------------------------------------------------------------------------
-static inline bool get_gpio(uint gpio)
-{
-    return sio_hw->gpio_in & (1u << gpio);
-}
-
-//-----------------------------------------------------------------------------
-static inline void set_gpio(uint gpio)
-{
-    sio_hw->gpio_set = 1u << gpio;
-}
-
-//-----------------------------------------------------------------------------
-static inline void clr_gpio(uint gpio)
-{
-    sio_hw->gpio_clr = 1u << gpio;
-}
-
-//-----------------------------------------------------------------------------
-static inline void set_bus_as_output(void)
-{
-    sio_hw->gpio_oe_set = 0xFF << D0_PIN;   // make data pins (D0-D7) outputs
-}
-
-//-----------------------------------------------------------------------------
-static inline void set_bus_as_input(void)
-{
-    sio_hw->gpio_oe_clr = 0xFF << D0_PIN;   // make data pins (D0-D7) inputs
-}
-
-//-----------------------------------------------------------------------------
-static inline void put_byte_on_bus(byte data)
-{
-    sio_hw->gpio_togl = (sio_hw->gpio_out ^ (data << D0_PIN)) & (0xFF << D0_PIN);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// restart pio code to release WAIT state
-void __not_in_flash_func(ReleaseWait)(void)
-{
-    clr_gpio(WAIT_PIN);
-
-    // wait for MREQ to go inactive
-    while (get_gpio(MREQ_PIN) == 0);
-}
-
-//-----------------------------------------------------------------------------
 void __not_in_flash_func(ServiceReadOperation)(word addr)
 {
     byte data;
@@ -271,7 +219,8 @@ void __not_in_flash_func(ServiceReadOperation)(word addr)
                 // put byte on data bus
                 put_byte_on_bus(data);
 
-                ReleaseWait();
+                clr_gpio(WAIT_PIN);
+                while (get_gpio(MREQ_PIN) == 0);
 
                 // turn bus around
                 set_gpio(DATAB_OE_PIN);     // disable data bus transciever
@@ -298,7 +247,8 @@ void __not_in_flash_func(ServiceReadOperation)(word addr)
                 // put byte on data bus
                 put_byte_on_bus(data);
 
-                ReleaseWait();
+                clr_gpio(WAIT_PIN);
+                while (get_gpio(MREQ_PIN) == 0);
 
                 // turn bus around
                 set_gpio(DATAB_OE_PIN);     // disable data bus transciever
@@ -317,7 +267,8 @@ void __not_in_flash_func(ServiceReadOperation)(word addr)
                     // put byte on data bus
                     put_byte_on_bus(data);
 
-                    ReleaseWait();
+                    clr_gpio(WAIT_PIN);
+                    while (get_gpio(MREQ_PIN) == 0);
 
                     // turn bus around
                     set_gpio(DATAB_OE_PIN); // disable data bus transciever
@@ -326,7 +277,8 @@ void __not_in_flash_func(ServiceReadOperation)(word addr)
                     break;
                 }
 
-                ReleaseWait();
+                clr_gpio(WAIT_PIN);
+                while (get_gpio(MREQ_PIN) == 0);
                 break;
         }
     }
@@ -339,7 +291,8 @@ void __not_in_flash_func(ServiceReadOperation)(word addr)
         // put byte on data bus
         put_byte_on_bus(by_memory[addr-0x8000]);
 
-        ReleaseWait();
+        clr_gpio(WAIT_PIN);
+        while (get_gpio(MREQ_PIN) == 0);
 
         // turn bus around
         set_gpio(DATAB_OE_PIN);             // disable data bus transciever
@@ -368,7 +321,8 @@ void __not_in_flash_func(ServiceWriteOperation)(word addr)
         set_gpio(DATAB_OE_PIN);
 
         VideoWrite(addr, ch);
-        ReleaseWait();
+        clr_gpio(WAIT_PIN);
+        while (get_gpio(MREQ_PIN) == 0);
     }
     else if (addr < 0x8000) // WR to lower 32k memory
     {
@@ -390,7 +344,8 @@ void __not_in_flash_func(ServiceWriteOperation)(word addr)
 
                 fdc_write_drive_select(data);
 
-                ReleaseWait();
+                clr_gpio(WAIT_PIN);
+                while (get_gpio(MREQ_PIN) == 0);
                 break;
 
             case 0x37EC: // Cmd/Status register
@@ -409,7 +364,8 @@ void __not_in_flash_func(ServiceWriteOperation)(word addr)
 
                 fdc_write(addr, data);
 
-                ReleaseWait();
+                clr_gpio(WAIT_PIN);
+                while (get_gpio(MREQ_PIN) == 0);
                 break;
 
             default:
@@ -430,7 +386,8 @@ void __not_in_flash_func(ServiceWriteOperation)(word addr)
                     fdc_request(addr, ch);
                 }
 
-                ReleaseWait();
+                clr_gpio(WAIT_PIN);
+                while (get_gpio(MREQ_PIN) == 0);
                 break;
         }
     }
@@ -446,7 +403,8 @@ void __not_in_flash_func(ServiceWriteOperation)(word addr)
         by_memory[addr-0x8000] = get_gpio_data_byte();
         set_gpio(DATAB_OE_PIN);
 
-        ReleaseWait();
+        clr_gpio(WAIT_PIN);
+        while (get_gpio(MREQ_PIN) == 0);
     }
 }
 
@@ -515,7 +473,8 @@ void __not_in_flash_func(service_memory)(void)
         }
         else
         {
-            ReleaseWait();
+            clr_gpio(WAIT_PIN);
+            while (get_gpio(MREQ_PIN) == 0);
         }
    }
 }
