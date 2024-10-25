@@ -91,6 +91,7 @@ void ProcessCommand(char* psz)
     {
         psz = GetWord(psz, szParm1, sizeof(szParm1)-2);
 		FdcSaveBootCfg(szParm1);
+        FdcProcessStatusRequest(true);
         return;
     }
 
