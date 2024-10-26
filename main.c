@@ -262,31 +262,8 @@ void __not_in_flash_func(ServiceSlowReadOperation)(word addr)
             break;
 
         default:
-            if ((addr >= FDC_RESPONSE_ADDR_START) && (addr <= FDC_RESPONSE_ADDR_STOP)) // fdc.cmd response area
-            {
-                data = fdc_response(addr);
-                clr_gpio(DIR_PIN);      // B to A direction
-                set_bus_as_output();    // make data pins (D0-D7) outputs
-                clr_gpio(DATAB_OE_PIN); // enable data bus transciever
-
-                // put byte on data bus
-                put_byte_on_bus(data);
-
-                clr_gpio(WAIT_PIN);
-                while (get_gpio(MREQ_PIN) == 0);
-
-                // turn bus around
-                set_gpio(DATAB_OE_PIN); // disable data bus transciever
-                set_bus_as_input();     // reset data pins (D0-D7) inputs
-                set_gpio(DIR_PIN);      // A to B direction
-                break;
-            }
-            else
-            {
-                clr_gpio(WAIT_PIN);
-                while (get_gpio(MREQ_PIN) == 0);
-            }
-
+            clr_gpio(WAIT_PIN);
+            while (get_gpio(MREQ_PIN) == 0);
             break;
     }
 }
@@ -344,19 +321,7 @@ void __not_in_flash_func(ServiceSlowWriteOperation)(word addr)
 {
     byte data;
 
-    if ((addr >= 0x3C00) && (addr <= 0x3FFF))
-    {
-        byte ch;
-
-        // get data byte
-        clr_gpio(DATAB_OE_PIN);
-        NopDelay();
-        ch = get_gpio_data_byte();
-        set_gpio(DATAB_OE_PIN);
-
-        VideoWrite(addr, ch);
-    }
-    else if (addr < 0x8000) // WR to lower 32k memory
+    if (addr < 0x8000) // WR to lower 32k memory
     {
         switch (addr)
         {
@@ -385,22 +350,6 @@ void __not_in_flash_func(ServiceSlowWriteOperation)(word addr)
 
                 fdc_write(addr, data);
                 break;
-
-            default:
-                if ((addr >= FDC_REQUEST_ADDR_START) && (addr <= FDC_REQUEST_ADDR_STOP)) // fdc.cmd request area
-                {
-                    byte ch;
-
-                    // get data byte
-                    clr_gpio(DATAB_OE_PIN);
-                    NopDelay();
-                    ch = get_gpio_data_byte();
-                    set_gpio(DATAB_OE_PIN);
-
-                    fdc_request(addr, ch);
-                }
-
-                break;
         }
     }
 
@@ -411,7 +360,19 @@ void __not_in_flash_func(ServiceSlowWriteOperation)(word addr)
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(ServiceFastWriteOperation)(word addr)
 {
-    if ((addr >= 0x3C00) && (addr <= 0x3FFF))
+    if ((addr >= FDC_REQUEST_ADDR_START) && (addr <= FDC_REQUEST_ADDR_STOP)) // fdc.cmd request area
+    {
+        byte ch;
+
+        // get data byte
+        clr_gpio(DATAB_OE_PIN);
+        NopDelay();
+        ch = get_gpio_data_byte();
+        set_gpio(DATAB_OE_PIN);
+
+        fdc_request(addr, ch);
+    }
+    else if ((addr >= 0x3C00) && (addr <= 0x3FFF))
     {
         byte ch;
 
@@ -480,7 +441,7 @@ void __not_in_flash_func(service_memory)(void)
 
         addr = get_address();
 
-        if ((addr >= 0x3000) && (addr < 0x3C00)) // activate WAIT_PIN
+        if ((addr >= 0x3400) && (addr < 0x3C00)) // activate WAIT_PIN
         {
             set_gpio(WAIT_PIN);
             fast = 0;

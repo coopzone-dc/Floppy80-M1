@@ -1276,6 +1276,7 @@ void FdcInit(void)
 void __not_in_flash_func(FdcGenerateIntr)(void)
 {
 	g_FDC.byNmiStatusReg = 0x7F; // inverted state of all bits low except INTRQ
+
 	g_FDC.status.byIntrRequest = 1;
 	g_byFdcIntrActive = true;
 	set_gpio(INT_PIN); // activate intr

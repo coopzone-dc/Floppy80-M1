@@ -354,7 +354,6 @@ void LoadHfeTrack(file* pFile, int nTrack, int nSide, HfeDriveType* pdisk, Track
 
 void FdcSetFlag(byte flag);
 void FdcClrFlag(byte flag);
-BYTE FdcGetCommandType(BYTE byCommand);
 void FdcGenerateIntr(void);
 void FdcStartCapture(void);
 void FdcInit(void);
