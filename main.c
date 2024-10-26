@@ -342,7 +342,22 @@ void __not_in_flash_func(ServiceSlowWriteOperation)(word addr)
 {
     byte data;
 
-    if (addr < 0x8000) // WR to lower 32k memory
+    if ((addr >= 0x3C00) && (addr <= 0x3FFF))
+    {
+        byte ch;
+
+        // get data byte
+        clr_gpio(DATAB_OE_PIN);
+        __nop();
+        __nop();
+        __nop();
+        __nop();
+        ch = get_gpio_data_byte();
+        set_gpio(DATAB_OE_PIN);
+
+        VideoWrite(addr, ch);
+    }
+    else if (addr < 0x8000) // WR to lower 32k memory
     {
         switch (addr)
         {
