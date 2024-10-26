@@ -35,7 +35,7 @@ FDC/CMD support
 --------------------
 - Lifeboat CPM 1.4.1
 - FMG CPM 1.5
-- Double DOS 4.2.4
++ Double DOS 4.2.4
 + LDOS 5.3.1
 + TRSDOS 2.3
 + UltraDOS 4.2.0

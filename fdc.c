@@ -2581,6 +2581,8 @@ void FdcServiceMountImage(void)
 		g_dtDives[nDrive].f = NULL;
 		FdcMountDrive(nDrive);
 	}
+
+    FdcProcessStatusRequest(false);
 }
 
 //-----------------------------------------------------------------------------
