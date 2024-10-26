@@ -2959,6 +2959,5 @@ void __not_in_flash_func(fdc_write_drive_select)(byte byData)
 		}
 	}
 
-//	FdcGetDriveIndex(byData);
 	g_FDC.dwMotorOnTimer = 2000000;
 }

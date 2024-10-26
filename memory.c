@@ -272,33 +272,13 @@ void __not_in_flash_func(ServiceFdcMemoryOperation)(word addr)
 }
 
 //-----------------------------------------------------------------------------
-word __not_in_flash_func(get_address)(void)
+void __not_in_flash_func(service_memory)(void)
 {
+    byte data;
     union {
         byte b[2];
         word w;
     } addr;
-
-    // read low address byte
-    clr_gpio(ADDRL_OE_PIN);
-    NopDelay();
-    addr.b[0] = get_gpio_data_byte();
-    set_gpio(ADDRL_OE_PIN);
-
-    // read high address byte
-    clr_gpio(ADDRH_OE_PIN);
-    NopDelay();
-    addr.b[1] = get_gpio_data_byte();
-    set_gpio(ADDRH_OE_PIN);
-
-    return addr.w;
-}
-
-//-----------------------------------------------------------------------------
-void __not_in_flash_func(service_memory)(void)
-{
-    byte data;
-    word addr;
 
     clr_gpio(WAIT_PIN);
 
@@ -310,27 +290,37 @@ void __not_in_flash_func(service_memory)(void)
         // wait for MREQ to go active
         while (get_gpio(MREQ_PIN) != 0);
 
-        addr = get_address();
+        // read low address byte
+        clr_gpio(ADDRL_OE_PIN);
+        NopDelay();
+        addr.b[0] = get_gpio_data_byte();
+        set_gpio(ADDRL_OE_PIN);
 
-        if ((addr >= 0x37E0) && (addr <= 0x37EF)) // activate WAIT_PIN
+        // read high address byte
+        clr_gpio(ADDRH_OE_PIN);
+        NopDelay();
+        addr.b[1] = get_gpio_data_byte();
+        set_gpio(ADDRH_OE_PIN);
+
+        if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF)) // activate WAIT_PIN
         {
-            ServiceFdcMemoryOperation(addr);
+            ServiceFdcMemoryOperation(addr.w);
         }
-        else if (addr >= 0x8000)
+        else if (addr.w >= 0x8000)
         {
-            ServiceHighMemoryOperation(addr);
+            ServiceHighMemoryOperation(addr.w);
         }
-        else if ((addr >= VIDEO_ADDR_START) && (addr <= VIDEO_ADDR_END))
+        else if ((addr.w >= VIDEO_ADDR_START) && (addr.w <= VIDEO_ADDR_END))
         {
-            ServiceVideoMemoryOperation(addr);
+            ServiceVideoMemoryOperation(addr.w);
         }
-        else if ((addr >= FDC_REQUEST_ADDR_START) && (addr <= FDC_REQUEST_ADDR_STOP))
+        else if ((addr.w >= FDC_REQUEST_ADDR_START) && (addr.w <= FDC_REQUEST_ADDR_STOP))
         {
-            ServiceFdcRequestOperation(addr);
+            ServiceFdcRequestOperation(addr.w);
         }
-        else if ((addr >= FDC_RESPONSE_ADDR_START) && (addr <= FDC_RESPONSE_ADDR_STOP))
+        else if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP))
         {
-            ServiceFdcResponseOperation(addr);
+            ServiceFdcResponseOperation(addr.w);
         }
    }
 }
