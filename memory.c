@@ -19,7 +19,7 @@
 #include "video.h"
 #include "cli.h"
 
-#define NopDelay() __nop(); __nop(); __nop(); __nop(); __nop();
+#define NopDelay() __nop(); __nop(); __nop(); __nop();
 
 extern byte g_byVideoMemory[VIDEO_BUFFER_SIZE];
 extern word g_wVideoLinesModified[MAX_VIDEO_LINES];
@@ -104,7 +104,6 @@ void __not_in_flash_func(ServiceFdcRequestOperation)(word addr)
     }
 
     clr_gpio(WAIT_PIN);
-    while (get_gpio(MREQ_PIN) == 0);
 }
 
 //-----------------------------------------------------------------------------
@@ -130,7 +129,6 @@ void __not_in_flash_func(ServiceVideoMemoryOperation)(word addr)
     else
     {
         clr_gpio(WAIT_PIN);
-        while (get_gpio(MREQ_PIN) == 0);
     }
 }
 
@@ -155,7 +153,6 @@ void __not_in_flash_func(ServiceHighMemoryOperation)(word addr)
     else
     {
         clr_gpio(WAIT_PIN);
-        while (get_gpio(MREQ_PIN) == 0);
     }
 }
 
@@ -245,14 +242,11 @@ void __not_in_flash_func(ServiceFdcWriteOperation)(word addr)
     }
 
     clr_gpio(WAIT_PIN);
-    while (get_gpio(MREQ_PIN) == 0);
 }
 
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(ServiceFdcMemoryOperation)(word addr)
 {
-    set_gpio(WAIT_PIN);
-
     // wait for RD or WR to go active or MREQ to go inactive
     while ((get_gpio(RD_PIN) != 0) && (get_gpio(WR_PIN) != 0) && (get_gpio(MREQ_PIN) == 0));
 
@@ -267,7 +261,6 @@ void __not_in_flash_func(ServiceFdcMemoryOperation)(word addr)
     else
     {
         clr_gpio(WAIT_PIN);
-        while (get_gpio(MREQ_PIN) == 0);
     }
 }
 
@@ -284,6 +277,8 @@ void __not_in_flash_func(service_memory)(void)
 
     while (1)
     {
+        clr_gpio(WAIT_PIN);
+
         // wait for MREQ to go inactive
         while (get_gpio(MREQ_PIN) == 0);
 
@@ -302,13 +297,15 @@ void __not_in_flash_func(service_memory)(void)
         addr.b[1] = get_gpio_data_byte();
         set_gpio(ADDRH_OE_PIN);
 
-        if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF)) // activate WAIT_PIN
-        {
-            ServiceFdcMemoryOperation(addr.w);
-        }
-        else if (addr.w >= 0x8000)
+        set_gpio(WAIT_PIN);
+
+        if (addr.w >= 0x8000)
         {
             ServiceHighMemoryOperation(addr.w);
+        }
+        else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF)) // activate WAIT_PIN
+        {
+            ServiceFdcMemoryOperation(addr.w);
         }
         else if ((addr.w >= VIDEO_ADDR_START) && (addr.w <= VIDEO_ADDR_END))
         {

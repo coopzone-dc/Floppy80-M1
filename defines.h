@@ -3,6 +3,7 @@
 #define _H_DEFINES_
 
 //#pragma GCC optimize ("O0")
+#pragma GCC optimize ("O3")
 
 #include <stdio.h>
 
