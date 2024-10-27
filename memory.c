@@ -297,26 +297,28 @@ void __not_in_flash_func(service_memory)(void)
         addr.b[1] = get_gpio_data_byte();
         set_gpio(ADDRH_OE_PIN);
 
-        set_gpio(WAIT_PIN);
-
         if (addr.w >= 0x8000)
         {
             ServiceHighMemoryOperation(addr.w);
         }
-        else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF)) // activate WAIT_PIN
+        else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF))
         {
+            set_gpio(WAIT_PIN);
             ServiceFdcMemoryOperation(addr.w);
         }
-        else if ((addr.w >= VIDEO_ADDR_START) && (addr.w <= VIDEO_ADDR_END))
-        {
-            ServiceVideoMemoryOperation(addr.w);
-        }
+        // else if ((addr.w >= VIDEO_ADDR_START) && (addr.w <= VIDEO_ADDR_END))
+        // {
+        //     set_gpio(WAIT_PIN);
+        //     ServiceVideoMemoryOperation(addr.w);
+        // }
         else if ((addr.w >= FDC_REQUEST_ADDR_START) && (addr.w <= FDC_REQUEST_ADDR_STOP))
         {
+            set_gpio(WAIT_PIN);
             ServiceFdcRequestOperation(addr.w);
         }
         else if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP))
         {
+            set_gpio(WAIT_PIN);
             ServiceFdcResponseOperation(addr.w);
         }
    }
