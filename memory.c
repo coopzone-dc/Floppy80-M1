@@ -244,10 +244,6 @@ void __not_in_flash_func(service_memory)(void)
         // wait for MREQ to go active
         while (get_gpio(MREQ_PIN) != 0);
 
-#ifdef PICO_RP2040
-        set_gpio(WAIT_PIN);
-#endif
-
         // read low address byte
         clr_gpio(ADDRL_OE_PIN);
         NopDelay();
@@ -262,6 +258,9 @@ void __not_in_flash_func(service_memory)(void)
 
         if (addr.w >= 0x8000)
         {
+#ifdef PICO_RP2040
+            set_gpio(WAIT_PIN);
+#endif
             ServiceHighMemoryOperation(addr.w);
         }
         else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF))
@@ -271,16 +270,12 @@ void __not_in_flash_func(service_memory)(void)
         }
         else if ((addr.w >= FDC_REQUEST_ADDR_START) && (addr.w <= FDC_REQUEST_ADDR_STOP))
         {
-#ifdef PICO_RP2040
             set_gpio(WAIT_PIN);
-#endif
             ServiceFdcRequestOperation(addr.w);
         }
         else if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP))
         {
-#ifdef PICO_RP2040
             set_gpio(WAIT_PIN);
-#endif
             ServiceFdcResponseOperation(addr.w);
         }
    }
