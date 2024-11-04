@@ -19,46 +19,26 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-uint32_t SystemCoreClock = 133000000;
-
 // Note: g_ (among other) prefix is used to denote global variables
 
 //-----------------------------------------------------------------------------
 // counter for real time clock (RTC)
 
-uint32_t g_dwForegroundRtc = 0;
-uint32_t g_dwBackgroundRtc;
-uint64_t g_nTimeStart;
-uint64_t g_nTimeEnd;
-uint64_t g_nTimeDiff;
+static uint32_t g_dwResetTime;
 
-uint32_t g_dwRotationTime;
-uint32_t g_dwIndexTime;
-uint32_t g_dwResetTime;
+static uint8_t  g_byMonitorReset;
+static uint32_t g_dwResetCount;
 
-uint8_t  g_byMonitorReset;
-uint32_t g_dwResetCount;
-uint8_t  g_byResetFDC;
+static uint64_t g_nTimeNow;
+static uint64_t g_nPrevTime;
 
-uint8_t  g_byMotorWasOn;
-
-uint64_t g_nTimeNow;
-uint64_t g_nPrevTime;
-
-uint32_t g_nRtcIntrCount;
-
-SystemType sysdef;
-
-uint64_t g_nWaitTime;
+static uint32_t g_nRtcIntrCount;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 void InitVars(void)
 {
-	g_dwRotationTime = 200000;	// 200ms
-	g_dwIndexTime    = 2800;	// 2.8ms
 	g_dwResetTime    = 1000;	// 1ms
 
-	g_byMotorWasOn = 0;
 	g_nTimeNow     = time_us_64();
 	g_nPrevTime    = g_nTimeNow;
 
@@ -66,185 +46,14 @@ void InitVars(void)
 
 	g_byMonitorReset = FALSE;
 	g_dwResetCount   = 0;
-	g_byResetFDC     = FALSE;
 
 	g_byRtcIntrActive = false;
 
 	g_byIntrRequest = 0;
-	g_dwWaitTimeoutCount = 0;
 	g_dwRotationCount = 0;
-	g_dwMotorOnTimer = 0;
-}
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
-const WORD wNormalYearDaysInMonth[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
-const WORD wLeapYearDaysInMonth[12]   = {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// parameters: dwSeconds - number of seconds since midnight on January 1st, 1980
-//
-//             pdt - pointer to a CodedDateTime structure to receive the coded date/time
-//                   - .year  - number of years since 1980.  A value of 43 relates to year 2023
-//                   - .month - zero based index of the month (0 - 11)
-//                   - .day   - zero based index of the day of the month (0 to one less than the number of days in the month)
-//                   - .hour  - zero based index of the hour of the day (0 - 23)
-//                   - .min   - zero based index of the minute in the hour (0 - 59)
-//                   - .sec   - zero based index of the second in the minute (0 - 59)
-//
-// Note, works up to February, 28h 2100
-//
-void CodeDateTime(DWORD dwSeconds, CodedDateTime* pdt)
-{
-	WORD  wNumDays, wYear, wDayOfYear, wTimeBalance, wNumLeapYears, j;
-	DWORD dwDayTime;
-
-	wNumDays     = (WORD)(dwSeconds / SECONDS_IN_DAY);
-	dwDayTime    = dwSeconds % SECONDS_IN_DAY;
-	pdt->hour    = dwDayTime / SECONDS_IN_HOUR;
-	wTimeBalance = dwDayTime % SECONDS_IN_HOUR;
-	pdt->min     = wTimeBalance / 60;
-	pdt->sec     = wTimeBalance % 60;
-
-	wNumLeapYears = wNumDays / DAYS_IN_FOUR_YEARS;
-	wNumDays      = wNumDays % DAYS_IN_FOUR_YEARS;
-
-	wYear      = wNumDays / 365 + wNumLeapYears * 4;
-	wDayOfYear = wNumDays % 365;
-	pdt->year  = wYear;
-
-	j = 11;
-	
-	while (wNormalYearDaysInMonth[j] > wDayOfYear)
-	{
-		j--;
-	}
-
-	pdt->month = j;												// coded 0..11
-	pdt->day   = wDayOfYear - wNormalYearDaysInMonth[j];		// days start at 0
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// psz - points to the null terminated string in the date/time format (MM/DD/YYYY hh:mm:ss)
-void ParseDateTime(char* psz, CodedDateTime* pdt)
-{
-	pdt->month = atoi(psz) - 1;
-	pdt->day   = 0;
-	pdt->year  = 0;
-	pdt->hour  = 0;
-	pdt->min   = 0;
-	pdt->sec   = 0;
-	
-	// get day
-	while ((*psz != 0) && (*psz != '/'))
-	{
-		++psz;
-	}
-	
-	if (*psz != '/')
-	{
-		return;
-	}
-	
-	++psz;
-
-	pdt->day = atoi(psz) - 1;
-
-	// get year
-	while ((*psz != 0) && (*psz != '/'))
-	{
-		++psz;
-	}
-	
-	if (*psz != '/')
-	{
-		return;
-	}
-	
-	++psz;
-
-	pdt->year = atoi(psz);
-	
-	if (pdt->year >= 80)
-	{
-		pdt->year += 1900;
-	}
-	else
-	{
-		pdt->year += 2000;
-	}
-
-	pdt->year -= 1980;
-	
-	// get hour
-	while ((*psz != 0) && (*psz != ' '))
-	{
-		++psz;
-	}
-	
-	if (*psz != ' ')
-	{
-		return;
-	}
-	
-	++psz;
-
-	pdt->hour = atoi(psz);
-
-	// get minute
-	while ((*psz != 0) && (*psz != ':'))
-	{
-		++psz;
-	}
-	
-	if (*psz != ':')
-	{
-		return;
-	}
-	
-	++psz;
-
-	pdt->min = atoi(psz);
-
-	// get second
-	while ((*psz != 0) && (*psz != ':'))
-	{
-		++psz;
-	}
-	
-	if (*psz != ':')
-	{
-		return;
-	}
-	
-	++psz;
-
-	pdt->sec = atoi(psz);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-unsigned long EncodeDateTime(CodedDateTime* pdt)
-{
-	unsigned long nTime;
-
-	nTime  = pdt->year * SECONDS_IN_YEAR;			// start with seconds for the specified years
-	nTime += ((pdt->year / 4) * SECONDS_IN_DAY);	// add a days seconds for each leap year
-
-	if (((pdt->year + 1980) % 4) == 0) // is this a leap year
-	{
-		nTime += (wLeapYearDaysInMonth[pdt->month] * SECONDS_IN_DAY); // number of seconds to day 1 of the specified month (for a leap year)
-	}
-	else
-	{
-		nTime += (wNormalYearDaysInMonth[pdt->month] * SECONDS_IN_DAY); // number of seconds to day 1 of the specified month (for a non leap year)
-	}
-
-	nTime += (pdt->day * SECONDS_IN_DAY);    // number of second to start of this day of the month
-	nTime += (pdt->hour * SECONDS_IN_HOUR);  // number of seconds to this hour
-	nTime += (pdt->min * 60);                // number of seconds to this minute
-	nTime += pdt->sec;                       // number of seconds to this second
-	
-	return nTime;
+	g_byResetActive = true;
+	g_byEnableIntr  = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -321,27 +130,6 @@ char* GetWord(char* psz, char* dest, int max_len)
     }
 
     return psz;
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-void CopySectionName(char* pszSrc, char* pszDst, int nMaxLen)
-{
-	int i = 0;
-	
-	if (*pszSrc == '[')
-	{
-		++pszSrc;
-	}
-	
-	while ((i < nMaxLen) && (*pszSrc != ']') && (*pszSrc != 0))
-	{
-		*pszDst = toupper(*pszSrc);
-		++pszDst;
-		++pszSrc;
-		++i;
-	}
-	
-	*pszDst = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -485,6 +273,7 @@ void strcat_s(char* pszDst, int nDstSize, char* pszSrc)
 	*pszDst = 0;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 void strcpy_s(char* pszDst, int nDstSize, char* pszSrc)
 {
 	int nLen = 0;
@@ -502,91 +291,22 @@ void strcpy_s(char* pszDst, int nDstSize, char* pszSrc)
 
 #endif
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-DWORD GetCycDuration(DWORD dwEndCount, DWORD dwStartCount)
-{
-	if (dwStartCount >= dwEndCount)
-	{
-		return dwStartCount - dwEndCount;
-	}
-	else
-	{
-		return (0x01000000 - dwEndCount) + dwStartCount;
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-uint32_t GetTimeDiff(uint64_t nTime1, uint64_t nTime2)
-{
-	if (nTime1 >= nTime2)
-	{
-		return (uint32_t)(nTime1 - nTime2);
-	}
-	else
-	{
-		return (uint32_t)(0x100000000 - nTime2 + nTime1);
-	}
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 void UpdateCounters(void)
 {
 	uint64_t nDiff;
 
 	g_nTimeNow  = time_us_64();
-	nDiff       = g_nTimeNow - g_nPrevTime; //GetTimeDiff(g_nTimeNow, g_nPrevTime);
+	nDiff       = g_nTimeNow - g_nPrevTime;
 	g_nPrevTime = g_nTimeNow;
 
 	g_nRtcIntrCount += nDiff;
 
 	if (g_nRtcIntrCount > 25000) // 25mS => 40Hz RTC interrupt
 	{
-		g_nRtcIntrCount -= 25000;
+		g_nRtcIntrCount  -= 25000;
 		g_byRtcIntrActive = true;
-	    gpio_put(INT_PIN, 1); // activate intr
-	}
-
-	if (g_dwWaitTimeoutCount > 0)
-	{
-		g_dwWaitTimeoutCount = CountDown(g_dwWaitTimeoutCount, nDiff);
-		
-		if (g_dwWaitTimeoutCount == 0) // release wait line
-		{
-		}
-	}
-
-	if (g_dwMotorOnTimer != 0)
-	{
-		g_byMotorWasOn = 1;
-
-		g_dwMotorOnTimer  = CountDown(g_dwMotorOnTimer, nDiff);
-		g_dwRotationCount = CountUp(g_dwRotationCount, nDiff);
-
-		// (g_dwTimerFrequency / 5) = count to make one full rotation of the diskette (200 ms at 300 RPM)
-		if (g_dwRotationCount >= g_dwRotationTime)
-		{
-			g_dwRotationCount -= g_dwRotationTime;
-		}
-
-		if (g_dwRotationCount < g_dwIndexTime)
-		{
-			FdcSetFlag(eIndex);
-			gpio_put(LED_PIN, 1);
-		}
-		else
-		{
-			FdcClrFlag(eIndex);
-			gpio_put(LED_PIN, 0);
-		}
-	}
-	else
-	{
-        gpio_put(LED_PIN, 1);
-
-		if (g_byMotorWasOn)
-		{
-			g_byMotorWasOn = 0;
-		}
+		g_byEnableIntr    = true;
 	}
 
 	if (get_cd())		// 0 => card removed; 1 => card inserted;
@@ -601,7 +321,7 @@ void UpdateCounters(void)
 		g_dwSdCardPresenceCount = 0;
 	}
 
-	if (!gpio_get(SYSRES_PIN))
+	if (g_byResetActive)
 	{
 		if (g_byMonitorReset)
 		{
@@ -610,10 +330,11 @@ void UpdateCounters(void)
 			if (g_dwResetCount >= g_dwResetTime) // ~ 1ms duration
 			{
 				g_byMonitorReset = FALSE;
-				g_byResetFDC = 1;
 				FileCloseAll();
-			    multicore_reset_core1();
-			    system_reset();
+//			    multicore_reset_core1();
+//			    system_reset();
+			    FileSystemInit();
+			    FdcInit();
 			}
 		}
 	}
@@ -622,133 +343,4 @@ void UpdateCounters(void)
 		g_dwResetCount   = 0;
 		g_byMonitorReset = TRUE;
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-void ValidateIniPath(char szPath[], int nMaxLen)
-{
-	char szTemp[256];
-
-	if (FileExists(szPath))
-	{
-		return;
-	}
-
-	strcpy_s(szTemp, sizeof(szTemp)-2, sysdef.szIniFolder);
-	AddTrailingBackslash(szTemp, sizeof(szTemp)-2);
-	strcat_s(szTemp, sizeof(szTemp)-2, szPath);
-
-	if (FileExists(szTemp))
-	{
-		strcpy_s(szPath, nMaxLen, szTemp);
-		return;
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-void ProcessConfigEntry(char szLabel[], char* psz)
-{
-	if (strcmp(szLabel, "DRIVE0") == 0)
-	{
-		CopyString(psz, sysdef.szDrivePath[0], sizeof(sysdef.szDrivePath[0])-2);
-		ValidateIniPath(sysdef.szDrivePath[0], sizeof(sysdef.szDrivePath[0])-2);
-	}
-	else if (strcmp(szLabel, "DRIVE1") == 0)
-	{
-		CopyString(psz, sysdef.szDrivePath[1], sizeof(sysdef.szDrivePath[1])-2);
-		ValidateIniPath(sysdef.szDrivePath[1], sizeof(sysdef.szDrivePath[1])-2);
-	}
-	else if (strcmp(szLabel, "DRIVE2") == 0)
-	{
-		CopyString(psz, sysdef.szDrivePath[2], sizeof(sysdef.szDrivePath[2])-2);
-		ValidateIniPath(sysdef.szDrivePath[2], sizeof(sysdef.szDrivePath[2])-2);
-	}
-	else if (strcmp(szLabel, "ROM") == 0)
-	{
-		CopyString(psz, sysdef.szRomPath, sizeof(sysdef.szRomPath)-2);
-		ValidateIniPath(sysdef.szRomPath, sizeof(sysdef.szRomPath)-2);
-	}
-	else if (strcmp(szLabel, "ROMADDR") == 0)
-	{
-		sysdef.nRomAddr = atoi(psz);
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-void RemoveFileNameFromPath(char szFileName[])
-{
-	char* psz = szFileName + strlen(szFileName) - 1;
-
-	while ((psz > szFileName) && (*psz != '\\'))
-	{
-		--psz;
-	}
-
-	if (*psz == '\\')
-	{
-		*psz = 0;
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-void AddTrailingBackslash(char szFilePath[], int nMaxLen)
-{
-	char* psz = szFilePath + strlen(szFilePath) - 1;
-
-	if (*psz == '\\')
-	{
-		return;
-	}
-
-	strcat_s(szFilePath, nMaxLen, (char*)"\\");
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-void LoadIniFile(char* pszFileName)
-{
-	file* f;
-	char  szLine[256];
-	char  szSection[16];
-	char  szLabel[128];
-	char* psz;
-	int   nLen;
-
-	memset(&sysdef, 0, sizeof(sysdef));
-
-	strcpy_s(sysdef.szIniFolder, sizeof(sysdef.szIniFolder)-2, pszFileName);
-	RemoveFileNameFromPath(sysdef.szIniFolder);
-
-	sysdef.nRomAddr = 0;
-
-	// read the default ini file to load on init
-	f = FileOpen(pszFileName, FA_READ);
-	
-	if (f == NULL)
-	{
-		return;
-	}
-
-	// open the ini file specified in boot.cfg
-	nLen = FileReadLine(f, szLine, sizeof(szLine)-2);
-	
-	while (nLen >= 0)
-	{
-		psz = SkipBlanks(szLine);
-		
-		if (*psz == '[')
-		{
-			CopySectionName(psz, szSection, sizeof(szSection)-1);
-		}
-		else if ((*psz != 0) && (*psz != ';')) // blank line or a comment line
-		{
-			StrToUpper(psz);
-			psz = CopyLabelName(psz, szLabel, sizeof(szLabel)-1);
-			ProcessConfigEntry(szLabel, psz);
-		}
-
-		nLen = FileReadLine(f, szLine, sizeof(szLine)-2);
-	}
-	
-	FileClose(f);
-  	InitVars();
 }

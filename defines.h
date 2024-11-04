@@ -178,28 +178,11 @@ enum {
 //-----------------------------------------------------------------------------
 // counter for real time clock (RTC).
 
-extern uint32_t g_dwForegroundRtc;
-extern uint32_t g_dwBackgroundRtc;
-extern uint16_t g_wWatchdogRefreshCounter;
-extern uint32_t g_dwRTC;
-
-extern uint8_t  g_byCaptureBusActivity;
-
-extern uint32_t g_dwRotationTime;
-extern uint32_t g_dwIndexTime;
-extern uint32_t g_dwResetTime;
-
-extern uint8_t  g_byMonitorReset;
-
-extern uint64_t g_nWaitTime;
-extern uint64_t g_nTimeStart;
-extern uint64_t g_nTimeEnd;
-extern uint64_t g_nTimeDiff;
-
-extern uint8_t  sd_byCardInialized;
-
-extern volatile byte g_byRtcIntrActive;
-extern volatile byte g_byFdcIntrActive;
+extern volatile uint8_t sd_byCardInialized;
+extern volatile byte    g_byRtcIntrActive;
+extern volatile byte    g_byFdcIntrActive;
+extern volatile byte    g_byResetActive;
+extern volatile byte    g_byEnableIntr;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -33,7 +33,6 @@ void OpenLogFile(void);
 void CloseLogFile(void);
 void WriteLogFile(char* psz);
 
-uint32_t GetCycDuration(uint32_t dwStart, uint32_t dwEnd);
 void  StartStopWatch(void);
 void  StopStopWatch(void);
 float GetStopWatchDuration(void);
@@ -47,7 +46,6 @@ char* SkipBlanks(char* psz);
 char* SkipToBlank(char* psz);
 char* GetWord(char* psz, char* dest, int max_len);
 
-void  CopySectionName(char* pszSrc, char* pszDst, int nMaxLen);
 char* CopyLabelName(char* pszSrc, char* pszDst, int nMaxLen);
 void  CopyString(char* pszSrc, char* pszDst, int nMaxLen);
 void  StrToUpper(char* psz);
@@ -64,10 +62,7 @@ void  AddTrailingBackslash(char szFilePath[], int nMaxLen);
 	UINT64 time_us_64(void);
 #endif
 
-uint32_t GetTimeDiff(uint64_t nTime1, uint64_t nTime2);
-void     UpdateCounters(void);
-void     LoadIniFile(char* pszFileName);
+void UpdateCounters(void);
+void LoadIniFile(char* pszFileName);
 
 #endif
-
-/* END OF FILE */

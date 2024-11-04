@@ -16,16 +16,17 @@
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-F_SPACE sd_Size;
-BYTE    sd_byCurrentCdState;
-BYTE    sd_byCurrentWpState;
-BYTE    sd_byCardRemoved;
-BYTE    sd_byCardInialized;
-BYTE    sd_byPreviousCdState;
-BYTE    sd_byPreviousWpState;
-WORD    sd_wCardInitTries;
-DWORD   g_dwSdCardPresenceCount;
-DWORD   g_dwSdCardMaxPresenceCount;
+volatile BYTE  sd_byCardInialized;
+volatile DWORD g_dwSdCardPresenceCount;
+volatile DWORD g_dwSdCardMaxPresenceCount;
+
+static F_SPACE sd_Size;
+static BYTE    sd_byCurrentCdState;
+static BYTE    sd_byCurrentWpState;
+static BYTE    sd_byCardRemoved;
+static BYTE    sd_byPreviousCdState;
+static BYTE    sd_byPreviousWpState;
+static WORD    sd_wCardInitTries;
 
 ////////////////////////////////////////////////////////////////////////////////////
 static FATFS *sd_get_fs_by_name(const char *name)

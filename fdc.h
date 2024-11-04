@@ -88,6 +88,13 @@ extern "C" {
 #define CPM_WRITE_BLOCK_CMD 0x11
 #define CPM_PARTITION_BASE  0x800
 
+#define FDC_READ_TRACK_SUCCESS 0
+#define FDC_READ_SECTOR_SUCCESS 0
+#define FDC_CRC_ERROR 1
+#define FDC_INVALID_DRIVE 2
+#define FDC_SECTOR_NOT_FOUND 3
+
+
 /* global variable declarations ==========================================*/
 
 enum {
@@ -349,11 +356,7 @@ typedef struct {
 /* ==============================================================*/
 
 extern volatile BYTE  g_byIntrRequest;
-extern volatile DWORD g_dwWaitTimeoutCount;
 extern volatile DWORD g_dwRotationCount;
-extern volatile DWORD g_dwMotorOnTimer;	// when not zero the drive motor is considered to be ON.
-										// when it reaches zero (after approximately 2 seconds) the motor is considered OFF.
-										// the 2 second count is reloated each time the DRV_SEL latch is written too.
 
 /* function prototypes ==========================================*/
 
@@ -379,6 +382,9 @@ void fdc_write_drive_select(byte byData);
 byte fdc_read_nmi(void);
 void fdc_write_nmi(byte byData);
 void fdc_process_command_request(byte by);
+
+byte fdc_get_response_byte(word addr);
+void fdc_put_request_byte(word addr, byte data);
 
 #ifdef __cplusplus
 }

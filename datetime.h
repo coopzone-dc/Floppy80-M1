@@ -13,6 +13,3 @@ typedef struct {
 	unsigned int year;
 } CodedDateTime;
 
-void CodeDateTime(unsigned long datetime, CodedDateTime* pdt);
-void ParseDateTime(char* psz, CodedDateTime* pdt);
-unsigned long EncodeDateTime(CodedDateTime* pdt);

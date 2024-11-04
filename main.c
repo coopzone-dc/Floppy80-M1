@@ -9,13 +9,11 @@
 #include "hardware/regs/intctrl.h"
 #include "hardware/clocks.h"
 #include "hardware/structs/systick.h"
-#include "tusb.h"
 
 #include "defines.h"
 #include "sd_core.h"
 #include "fdc.h"
 #include "system.h"
-#include "video.h"
 #include "cli.h"
 #include "memory.h"
 
@@ -188,10 +186,13 @@ int main()
     FdcInit();
     InitCli();
 
-    // wait for reset to be released
-    while (!gpio_get(SYSRES_PIN));
-
     multicore_launch_core1(service_memory);
+
+    // wait for reset to be released
+    while (g_byResetActive)
+    {
+        tight_loop_contents();
+    }
 
     while (true)
     {

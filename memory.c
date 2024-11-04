@@ -4,29 +4,17 @@
 #include "pico/multicore.h"
 #include "hardware/gpio.h"
 
-#include "hardware/pio.h"
-#include "hardware/irq.h"
-#include "hardware/regs/intctrl.h"
-#include "hardware/clocks.h"
-#include "hardware/structs/systick.h"
-#include "tusb.h"
-
 #include "defines.h"
-#include "sd_core.h"
 #include "fdc.h"
-#include "system.h"
-#include "video.h"
-#include "cli.h"
 
 #define NopDelay() __nop(); __nop(); __nop(); __nop(); __nop(); __nop(); __nop(); __nop();
 
-extern BufferType g_bFdcRequest;
-extern BufferType g_bFdcResponse;
-
-byte by_memory[0x8000];
+static byte by_memory[0x8000];
 
 volatile byte g_byRtcIntrActive;
 volatile byte g_byFdcIntrActive;
+volatile byte g_byResetActive;
+volatile byte g_byEnableIntr;
 
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(ServiceMemoryRead)(byte data)
@@ -58,16 +46,7 @@ void __not_in_flash_func(ServiceFdcResponseOperation)(word addr)
     if (get_gpio(RD_PIN) == 0)
     {
         addr -= FDC_RESPONSE_ADDR_START;
-
-        if (addr < FDC_CMD_SIZE)
-        {
-            data = g_bFdcResponse.cmd[addr];
-        }
-        else
-        {
-            data = g_bFdcResponse.buf[addr-FDC_CMD_SIZE];
-        }
-
+        data = fdc_get_response_byte(addr);
         ServiceMemoryRead(data);
     }
 }
@@ -89,15 +68,8 @@ void __not_in_flash_func(ServiceFdcRequestOperation)(word addr)
         set_gpio(DATAB_OE_PIN);
 
         addr -= FDC_REQUEST_ADDR_START;
+        fdc_put_request_byte(addr, data);
 
-        if (addr < FDC_CMD_SIZE)
-        {
-            g_bFdcRequest.cmd[addr] = data;
-        }
-        else
-        {
-            g_bFdcRequest.buf[addr-FDC_CMD_SIZE] = data;
-        }
     }
 
     clr_gpio(WAIT_PIN);
@@ -238,15 +210,28 @@ void __not_in_flash_func(service_memory)(void)
     {
         clr_gpio(WAIT_PIN);
 
+        while (!gpio_get(SYSRES_PIN))
+        {
+           	g_byResetActive = true;
+        }
+
+       	g_byResetActive = false;
+
         // wait for MREQ to go inactive
         while (get_gpio(MREQ_PIN) == 0);
+
+        if (g_byEnableIntr)
+        {
+            g_byEnableIntr = false;
+        	set_gpio(INT_PIN); // activate intr
+        }
 
         // wait for MREQ to go active
         while (get_gpio(MREQ_PIN) != 0);
 
-#ifdef PICO_RP2040
+//#ifdef PICO_RP2040
         set_gpio(WAIT_PIN);
-#endif
+//#endif
 
         // read low address byte
         clr_gpio(ADDRL_OE_PIN);

@@ -5,7 +5,10 @@
 
 //-----------------------------------------------------------------------------
 
-file g_fFiles[MAX_FILES];
+static file g_fFiles[MAX_FILES];
+static FRESULT fr;  /* Return value */
+static DIR     dj;  /* Directory object */
+static FILINFO fno; /* File information */
 
 //-----------------------------------------------------------------------------
 file* FileOpen(char* pszFileName, BYTE byMode)
@@ -287,10 +290,6 @@ BYTE FileExists(char* pszFileName)
 	f.Close();
 	return TRUE;
 #else
-	FRESULT fr;  /* Return value */
-	DIR     dj;  /* Directory object */
-	FILINFO fno; /* File information */
-	
 	memset(&dj, 0, sizeof(dj));
 	memset(&fno, 0, sizeof(fno));
 

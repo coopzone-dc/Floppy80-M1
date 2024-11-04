@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "hardware/gpio.h"
+#include "pico/stdlib.h"
 
 #include "defines.h"
 #include "datetime.h"
@@ -14,7 +15,7 @@
 #include "sd_core.h"
 
 //#define ENABLE_LOGGING 1
-//#pragma GCC optimize ("Og")
+#pragma GCC optimize ("Og")
 
 ////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -162,35 +163,38 @@ DAM marker values:
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-char* g_pszVersion = {"0.0.4"};
+static char* g_pszVersion = {"0.0.4"};
 
-FdcType       g_FDC;
-FdcDriveType  g_dtDives[MAX_DRIVES];
-TrackType     g_tdTrack;
-SectorType    g_stSector;
+static FdcType       g_FDC;
+static FdcDriveType  g_dtDives[MAX_DRIVES];
+static TrackType     g_tdTrack;
+static SectorType    g_stSector;
 
-char     g_szBootConfig[80];
-BYTE     g_byBootConfigModified;
+static char     g_szBootConfig[80];
+static BYTE     g_byBootConfigModified;
 
-BufferType g_bFdcRequest;
-BufferType g_bFdcResponse;
+static BufferType g_bFdcRequest;
+static BufferType g_bFdcResponse;
 
-DIR     g_dj;				// Directory object
-FILINFO g_fno;				// File information
-char    g_szBootConfig[80];
-BYTE    g_byBootConfigModified;
+static DIR     g_dj;				// Directory object
+static FILINFO g_fno;				// File information
 
-char    g_szFindFilter[80];
+static char    g_szFindFilter[80];
 
 #define FIND_MAX_SIZE 100
 
-FILINFO g_fiFindResults[FIND_MAX_SIZE];
-int     g_nFindIndex;
-int     g_nFindCount;
+static FILINFO g_fiFindResults[FIND_MAX_SIZE];
+static int     g_nFindIndex;
+static int     g_nFindCount;
 
-BYTE    g_byTrackBuffer[MAX_TRACK_SIZE];
+static BYTE    g_byTrackBuffer[MAX_TRACK_SIZE];
 
-	
+static uint8_t  g_byMotorWasOn;
+static uint64_t g_nTimeNow;
+static uint64_t g_nPrevTime;
+static uint32_t g_dwRotationTime;
+static uint32_t g_dwIndexTime;
+
 //-----------------------------------------------------------------------------
 
 volatile BYTE  g_byIntrRequest;		// controls the INTRQ output pin.  Which simulates an open drain output that when set indicates the completion
@@ -201,7 +205,6 @@ volatile BYTE  g_byIntrRequest;		// controls the INTRQ output pin.  Which simula
 							//
 							// when enabled via the corresponding bit of byNmiMaskReg the NMI output is the inverted state of byIntrReq
 
-volatile DWORD g_dwWaitTimeoutCount;
 volatile DWORD g_dwRotationCount;
 volatile DWORD g_dwMotorOnTimer;
 
@@ -866,12 +869,13 @@ WORD FdcGetDmkSectorCRC(int nDrive, int nDataOffset, int nDensityAdjust, int nDa
 }
 
 //-----------------------------------------------------------------------------
-void FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
+int FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 {
 	BYTE* pby;
 	WORD  wCalcCRC16;
 	int   nDrive, nDataOffset, nDensityAdjust;
 	int   nDataSize = 1;
+	int   ret = FDC_READ_SECTOR_SUCCESS;
 
 	g_FDC.nDataSize = 1;
 
@@ -884,7 +888,7 @@ void FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	if (nDrive < 0)
 	{
-		return;
+		return FDC_INVALID_DRIVE;
 	}
 
 	FdcReadTrack(nDrive, nSide, nTrack);
@@ -931,7 +935,7 @@ void FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcClrFlag(eRecordType);
 		FdcSetFlag(eNotFound);
-		return;
+		return FDC_SECTOR_NOT_FOUND;
 	}
 
 	if (nDataSize == 2)
@@ -962,6 +966,7 @@ void FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 	if (wCalcCRC16 != wCRC16)
 	{
 		FdcSetFlag(eCrcError);
+		ret = FDC_CRC_ERROR;
 	}
 
 	nDataOffset = g_tdTrack.nDAM[nSector];	// offset to first bytes of the sector data mark sequence (0xA1, 0xA1, 0xA1, 0xFB/0xF8)
@@ -973,7 +978,7 @@ void FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcClrFlag(eRecordType);
 		FdcSetFlag(eNotFound);
-		return;
+		return FDC_SECTOR_NOT_FOUND;
 	}
 
 	// for double density drives nDataOffset is the index of the first 0xA1 byte in the 0xA1, 0xA1, 0xA1, 0xFB/0xF8 sequence
@@ -1008,7 +1013,10 @@ void FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 	if (wCalcCRC16 != wCRC16)
 	{
 		FdcSetFlag(eCrcError);
+		return FDC_CRC_ERROR;
 	}
+
+	return ret;
 }
 
 //-----------------------------------------------------------------------------
@@ -1059,14 +1067,25 @@ void FdcReadHfeSector(int nDriveSel, int nSide, int nTrack, int nSector)
 //-----------------------------------------------------------------------------
 void FdcReadSector(int nDriveSel, int nSide, int nTrack, int nSector)
 {
-	int nDrive;
+	int nDrive, tries, result;
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 
 	switch (g_dtDives[nDrive].nDriveFormat)
 	{
 		case eDMK:
-			FdcReadDmkSector(nDriveSel, nSide, nTrack, nSector);
+			tries = 0;
+			
+			// do {
+				++tries;
+				result = FdcReadDmkSector(nDriveSel, nSide, nTrack, nSector);
+
+			// 	if (result != FDC_READ_SECTOR_SUCCESS)
+			// 	{
+			// 		g_tdTrack.nDrive = g_tdTrack.nSide = g_tdTrack.nTrack = -1;
+			// 	}
+			// } while ((result != FDC_READ_SECTOR_SUCCESS) && (tries < 5));
+
 			break;
 
 		case eHFE:
@@ -1233,11 +1252,7 @@ void FdcLoadIni(void)
 	{
 		psz = SkipBlanks(szLine);
 		
-		if (*psz == '[')
-		{
-			CopySectionName(psz, szSection, sizeof(szSection)-1);
-		}
-		else if ((*psz != 0) && (*psz != ';')) // blank line or a comment line
+		if ((*psz != 0) && (*psz != ';')) // blank line or a comment line
 		{
 			StrToUpper(psz);
 			psz = CopyLabelName(psz, szLabel, sizeof(szLabel)-1);
@@ -1285,6 +1300,13 @@ void FdcInit(void)
 	g_FDC.byCurCommand  = 255;
 	g_FDC.byDriveSel    = 0x01;
 	g_FDC.byCommandType = 1;
+
+	g_nTimeNow       = time_us_64();
+	g_nPrevTime      = g_nTimeNow;
+	g_byMotorWasOn   = 0;
+	g_dwMotorOnTimer = 0;
+	g_dwRotationTime = 200000;	// 200ms
+	g_dwIndexTime    = 2800;	// 2.8ms
 }
 
 //-----------------------------------------------------------------------------
@@ -1292,9 +1314,9 @@ void __not_in_flash_func(FdcGenerateIntr)(void)
 {
 	g_FDC.byNmiStatusReg = 0x7F; // inverted state of all bits low except INTRQ
 
-	g_byIntrRequest = 1;
+	g_byIntrRequest   = 1;
 	g_byFdcIntrActive = true;
-	set_gpio(INT_PIN); // activate intr
+	g_byEnableIntr    = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -2713,8 +2735,52 @@ void FdcProcessRequest(void)
 }
 
 //-----------------------------------------------------------------------------
+void FdcUpdateCounters(void)
+{
+	uint64_t nDiff;
+
+	if (g_dwMotorOnTimer != 0)
+	{
+		g_nTimeNow  = time_us_64();
+		nDiff       = g_nTimeNow - g_nPrevTime;
+		g_nPrevTime = g_nTimeNow;
+		g_byMotorWasOn = 1;
+
+		g_dwMotorOnTimer  = CountDown(g_dwMotorOnTimer, nDiff);
+		g_dwRotationCount = CountUp(g_dwRotationCount, nDiff);
+
+		// (g_dwTimerFrequency / 5) = count to make one full rotation of the diskette (200 ms at 300 RPM)
+		if (g_dwRotationCount >= g_dwRotationTime)
+		{
+			g_dwRotationCount -= g_dwRotationTime;
+		}
+
+		if (g_dwRotationCount < g_dwIndexTime)
+		{
+			FdcSetFlag(eIndex);
+			gpio_put(LED_PIN, 1);
+		}
+		else
+		{
+			FdcClrFlag(eIndex);
+			gpio_put(LED_PIN, 0);
+		}
+	}
+	else
+	{
+        gpio_put(LED_PIN, 1);
+
+		if (g_byMotorWasOn)
+		{
+			g_byMotorWasOn = 0;
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
 void FdcServiceStateMachine(void)
 {
+	FdcUpdateCounters();
 	TestSdCardInsertion();
 
     if (g_bFdcRequest.cmd[0] != 0)
@@ -3043,3 +3109,30 @@ void __not_in_flash_func(fdc_write_drive_select)(byte byData)
 	g_FDC.byDriveSel = byData;
 	g_dwMotorOnTimer = 2000000;
 }
+
+//-----------------------------------------------------------------------------
+byte __not_in_flash_func(fdc_get_response_byte)(word addr)
+{
+	if (addr < FDC_CMD_SIZE)
+	{
+		return g_bFdcResponse.cmd[addr];
+	}
+	else
+	{
+		return g_bFdcResponse.buf[addr-FDC_CMD_SIZE];
+	}
+}
+
+//-----------------------------------------------------------------------------
+void __not_in_flash_func(fdc_put_request_byte)(word addr, byte data)
+{
+	if (addr < FDC_CMD_SIZE)
+	{
+		g_bFdcRequest.cmd[addr] = data;
+	}
+	else
+	{
+		g_bFdcRequest.buf[addr-FDC_CMD_SIZE] = data;
+	}
+}
+

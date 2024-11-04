@@ -7,9 +7,9 @@
 
 /* global variable declarations ==========================================*/
 
-extern BYTE    sd_byCardInialized;
-extern DWORD   g_dwSdCardPresenceCount;
-extern DWORD   g_dwSdCardMaxPresenceCount;
+extern volatile BYTE  sd_byCardInialized;
+extern volatile DWORD g_dwSdCardPresenceCount;
+extern volatile DWORD g_dwSdCardMaxPresenceCount;
 
 /* function prototypes ==========================================*/
 

@@ -48,10 +48,6 @@ add_executable(Floppy80
     memory.c
 )
 
-pico_generate_pio_header(${PROJECT_NAME}
-    ${CMAKE_CURRENT_LIST_DIR}/fdc.pio
-)
-
 # pull in common dependencies
 target_link_libraries(Floppy80
     pico_stdlib

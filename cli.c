@@ -7,21 +7,20 @@
 #include "system.h"
 #include "file.h"
 #include "fdc.h"
-#include "video.h"
 #include "cli.h"
 
-uint64_t g_nCdcPrevTime;
-uint32_t g_nCdcConnectDuration;
-bool     g_bCdcConnected;
-bool     g_bCdcPromptSent;
+static uint64_t g_nCdcPrevTime;
+static uint32_t g_nCdcConnectDuration;
+static bool     g_bCdcConnected;
+static bool     g_bCdcPromptSent;
 
-char     g_szCommandLine[64];
-int      g_nCommandLineIndex;
+static char     g_szCommandLine[64];
+static int      g_nCommandLineIndex;
 
 static DIR     dj;				// Directory object
 static FILINFO fno;				// File information
 
-char szHelpText[] = {
+static char szHelpText[] = {
                         "\n"
                         "help   - returns this message\n"
                         "status - returns the current FDC status\n"
@@ -129,7 +128,7 @@ void ServiceCli(void)
     if (g_bCdcPromptSent == false)
     {
         nTimeNow = time_us_64();
-        g_nCdcConnectDuration += GetTimeDiff(g_nCdcPrevTime, nTimeNow);
+        g_nCdcConnectDuration += (g_nCdcPrevTime - nTimeNow);
         g_nCdcPrevTime = nTimeNow;
 
         if (g_nCdcConnectDuration < 2000000)
