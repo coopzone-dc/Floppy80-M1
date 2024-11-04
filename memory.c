@@ -25,8 +25,8 @@ extern BufferType g_bFdcResponse;
 
 byte by_memory[0x8000];
 
-byte g_byRtcIntrActive;
-byte g_byFdcIntrActive;
+volatile byte g_byRtcIntrActive;
+volatile byte g_byFdcIntrActive;
 
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(ServiceMemoryRead)(byte data)
@@ -136,7 +136,7 @@ void __not_in_flash_func(ServiceFdcReadOperation)(word addr)
         case 0x37E3:
             data = 0x3F;
 
-            if (g_FDC.status.byIntrRequest)
+            if (g_byIntrRequest)
             {
                 data |= 0x40;
             }

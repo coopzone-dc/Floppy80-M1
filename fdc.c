@@ -169,15 +169,12 @@ FdcDriveType  g_dtDives[MAX_DRIVES];
 TrackType     g_tdTrack;
 SectorType    g_stSector;
 
-uint64_t g_nMaxSeekTime;
-uint32_t g_dwPrevTraceCycleCount = 0;
 char     g_szBootConfig[80];
 BYTE     g_byBootConfigModified;
 
 BufferType g_bFdcRequest;
 BufferType g_bFdcResponse;
 
-file*   g_fOpenFile;
 DIR     g_dj;				// Directory object
 FILINFO g_fno;				// File information
 char    g_szBootConfig[80];
@@ -192,6 +189,21 @@ int     g_nFindIndex;
 int     g_nFindCount;
 
 BYTE    g_byTrackBuffer[MAX_TRACK_SIZE];
+
+	
+//-----------------------------------------------------------------------------
+
+volatile BYTE  g_byIntrRequest;		// controls the INTRQ output pin.  Which simulates an open drain output that when set indicates the completion
+							// of any command and is reset when the computer reads or writes to/from the DR.
+							//
+							// when 1 => command has been completed;
+							//      0 => command can be written or that a command is in progress;
+							//
+							// when enabled via the corresponding bit of byNmiMaskReg the NMI output is the inverted state of byIntrReq
+
+volatile DWORD g_dwWaitTimeoutCount;
+volatile DWORD g_dwRotationCount;
+volatile DWORD g_dwMotorOnTimer;
 
 //-----------------------------------------------------------------------------
 int __not_in_flash_func(FdcGetDriveIndex)(int nDriveSel)
@@ -1273,8 +1285,6 @@ void FdcInit(void)
 	g_FDC.byCurCommand  = 255;
 	g_FDC.byDriveSel    = 0x01;
 	g_FDC.byCommandType = 1;
-
-	g_nMaxSeekTime = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -1282,7 +1292,7 @@ void __not_in_flash_func(FdcGenerateIntr)(void)
 {
 	g_FDC.byNmiStatusReg = 0x7F; // inverted state of all bits low except INTRQ
 
-	g_FDC.status.byIntrRequest = 1;
+	g_byIntrRequest = 1;
 	g_byFdcIntrActive = true;
 	set_gpio(INT_PIN); // activate intr
 }
@@ -2838,10 +2848,10 @@ void __not_in_flash_func(fdc_command_write)(byte byData)
 	g_FDC.byCommandType  = FdcGetCommandType(byData);
 	g_FDC.byNmiStatusReg = 0xFF;
 
-	if (g_FDC.status.byIntrRequest)
+	if (g_byIntrRequest)
 	{
 		g_FDC.byNmiStatusReg = 0xFF; // inverted state of all bits low except INTRQ
-		g_FDC.status.byIntrRequest = 0;
+		g_byIntrRequest = 0;
 		g_byFdcIntrActive = false;
 	}
 
@@ -2942,10 +2952,10 @@ byte __not_in_flash_func(fdc_read)(word wAddr)
 
 			++g_FDC.nReadStatusCount;
 
-			if (g_FDC.status.byIntrRequest)
+			if (g_byIntrRequest)
 			{
 				g_FDC.byNmiStatusReg = 0xFF; // inverted state of all bits low except INTRQ
-				g_FDC.status.byIntrRequest = 0;
+				g_byIntrRequest = 0;
 				g_byFdcIntrActive = false;
 			}
 
@@ -3031,5 +3041,5 @@ void __not_in_flash_func(fdc_write_drive_select)(byte byData)
 #endif
 
 	g_FDC.byDriveSel = byData;
-	g_FDC.dwMotorOnTimer = 2000000;
+	g_dwMotorOnTimer = 2000000;
 }

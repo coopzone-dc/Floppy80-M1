@@ -69,6 +69,11 @@ void InitVars(void)
 	g_byResetFDC     = FALSE;
 
 	g_byRtcIntrActive = false;
+
+	g_byIntrRequest = 0;
+	g_dwWaitTimeoutCount = 0;
+	g_dwRotationCount = 0;
+	g_dwMotorOnTimer = 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -541,29 +546,29 @@ void UpdateCounters(void)
 	    gpio_put(INT_PIN, 1); // activate intr
 	}
 
-	if (g_FDC.dwWaitTimeoutCount > 0)
+	if (g_dwWaitTimeoutCount > 0)
 	{
-		g_FDC.dwWaitTimeoutCount = CountDown(g_FDC.dwWaitTimeoutCount, nDiff);
+		g_dwWaitTimeoutCount = CountDown(g_dwWaitTimeoutCount, nDiff);
 		
-		if (g_FDC.dwWaitTimeoutCount == 0) // release wait line
+		if (g_dwWaitTimeoutCount == 0) // release wait line
 		{
 		}
 	}
 
-	if (g_FDC.dwMotorOnTimer != 0)
+	if (g_dwMotorOnTimer != 0)
 	{
 		g_byMotorWasOn = 1;
 
-		g_FDC.dwMotorOnTimer  = CountDown(g_FDC.dwMotorOnTimer, nDiff);
-		g_FDC.dwRotationCount = CountUp(g_FDC.dwRotationCount, nDiff);
+		g_dwMotorOnTimer  = CountDown(g_dwMotorOnTimer, nDiff);
+		g_dwRotationCount = CountUp(g_dwRotationCount, nDiff);
 
 		// (g_dwTimerFrequency / 5) = count to make one full rotation of the diskette (200 ms at 300 RPM)
-		if (g_FDC.dwRotationCount >= g_dwRotationTime)
+		if (g_dwRotationCount >= g_dwRotationTime)
 		{
-			g_FDC.dwRotationCount -= g_dwRotationTime;
+			g_dwRotationCount -= g_dwRotationTime;
 		}
 
-		if (g_FDC.dwRotationCount < g_dwIndexTime)
+		if (g_dwRotationCount < g_dwIndexTime)
 		{
 			FdcSetFlag(eIndex);
 			gpio_put(LED_PIN, 1);

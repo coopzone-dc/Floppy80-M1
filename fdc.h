@@ -181,14 +181,6 @@ typedef struct {
 							//      0 => data is not available to be read/written;
 							//
 							// when enabled via the corresponding bit of byNmiMaskReg the WAIT output is the inverted state of byDataReq
-	
-	BYTE byIntrRequest;		// controls the INTRQ output pin.  Which simulates an open drain output that when set indicates the completion
-							// of any command and is reset when the computer reads or writes to/from the DR.
-							//
-							// when 1 => command has been completed;
-							//      0 => command can be written or that a command is in progress;
-							//
-							// when enabled via the corresponding bit of byNmiMaskReg the NMI output is the inverted state of byIntrReq
 } FDC_StatusType;
 
 typedef struct {
@@ -314,13 +306,6 @@ typedef struct {
 	BYTE  byWaitOutput;		// when 1 => wait line is being held low;
 							//      0 => wait line is released;
 
-	DWORD dwWaitTimeoutCount;
-	DWORD dwRotationCount;
-
-	DWORD dwMotorOnTimer;	// when not zero the drive motor is considered to be ON.
-							// when it reaches zero (after approximately 2 seconds) the motor is considered OFF.
-							// the 2 second count is reloated each time the DRV_SEL latch is written too.
-
 	DWORD dwResetCount;		// increments when the FDC RESET input is low, is set to zero when FDC RESET is high
 							// this can be used to determine if the FDC has received a RESET pulse
 	BYTE  byResetFDC;
@@ -363,8 +348,12 @@ typedef struct {
 
 /* ==============================================================*/
 
-extern FdcType   g_FDC;
-extern TrackType g_tdTrack;
+extern volatile BYTE  g_byIntrRequest;
+extern volatile DWORD g_dwWaitTimeoutCount;
+extern volatile DWORD g_dwRotationCount;
+extern volatile DWORD g_dwMotorOnTimer;	// when not zero the drive motor is considered to be ON.
+										// when it reaches zero (after approximately 2 seconds) the motor is considered OFF.
+										// the 2 second count is reloated each time the DRV_SEL latch is written too.
 
 /* function prototypes ==========================================*/
 
