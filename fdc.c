@@ -1067,25 +1067,14 @@ void FdcReadHfeSector(int nDriveSel, int nSide, int nTrack, int nSector)
 //-----------------------------------------------------------------------------
 void FdcReadSector(int nDriveSel, int nSide, int nTrack, int nSector)
 {
-	int nDrive, tries, result;
+	int nDrive;
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 
 	switch (g_dtDives[nDrive].nDriveFormat)
 	{
 		case eDMK:
-			tries = 0;
-			
-			// do {
-				++tries;
-				result = FdcReadDmkSector(nDriveSel, nSide, nTrack, nSector);
-
-			// 	if (result != FDC_READ_SECTOR_SUCCESS)
-			// 	{
-			// 		g_tdTrack.nDrive = g_tdTrack.nSide = g_tdTrack.nTrack = -1;
-			// 	}
-			// } while ((result != FDC_READ_SECTOR_SUCCESS) && (tries < 5));
-
+			FdcReadDmkSector(nDriveSel, nSide, nTrack, nSector);
 			break;
 
 		case eHFE:
@@ -2758,12 +2747,12 @@ void FdcUpdateCounters(void)
 		if (g_dwRotationCount < g_dwIndexTime)
 		{
 			FdcSetFlag(eIndex);
-			gpio_put(LED_PIN, 1);
+		 	gpio_put(LED_PIN, 1);
 		}
 		else
 		{
 			FdcClrFlag(eIndex);
-			gpio_put(LED_PIN, 0);
+		 	gpio_put(LED_PIN, 0);
 		}
 	}
 	else

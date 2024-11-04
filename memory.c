@@ -210,7 +210,7 @@ void __not_in_flash_func(service_memory)(void)
     {
         clr_gpio(WAIT_PIN);
 
-        while (!gpio_get(SYSRES_PIN))
+        while (!get_gpio(SYSRES_PIN))
         {
            	g_byResetActive = true;
         }
@@ -220,18 +220,18 @@ void __not_in_flash_func(service_memory)(void)
         // wait for MREQ to go inactive
         while (get_gpio(MREQ_PIN) == 0);
 
-        if (g_byEnableIntr)
-        {
-            g_byEnableIntr = false;
-        	set_gpio(INT_PIN); // activate intr
-        }
-
         // wait for MREQ to go active
         while (get_gpio(MREQ_PIN) != 0);
 
 //#ifdef PICO_RP2040
         set_gpio(WAIT_PIN);
 //#endif
+
+        if (g_byEnableIntr)
+        {
+            g_byEnableIntr = false;
+        	set_gpio(INT_PIN); // activate intr
+        }
 
         // read low address byte
         clr_gpio(ADDRL_OE_PIN);
