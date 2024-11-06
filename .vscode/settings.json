@@ -84,7 +84,9 @@
         "video.h": "c",
         "pico.h": "c",
         "time.h": "c",
-        "datetime.h": "c"
+        "datetime.h": "c",
+        "mutex.h": "c",
+        "util.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

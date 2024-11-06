@@ -2,29 +2,17 @@
 #ifndef _SYSTEM_H
 #define _SYSTEM_H
 
-#define MAX_DRIVES 3
-
 #ifndef MAX_PATH
-	#define MAX_PATH 256
+	#define MAX_PATH 64
 #endif
 
 // structures
 //-----------------------------------------------------------------------------
 
-typedef struct {
-	int  nModel;
-	char szIniFolder[256];
-	char szDrivePath[MAX_DRIVES][MAX_PATH];
-	char szRomPath[MAX_PATH];
-	int  nRomAddr;
-} SystemType;
-
 // unions
 //-----------------------------------------------------------------------------
 
 // variables
-
-extern SystemType sysdef;
 
 // function definitions
 //-----------------------------------------------------------------------------

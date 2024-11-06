@@ -3,7 +3,7 @@
 #define _H_DEFINES_
 
 //#pragma GCC optimize ("O0")
-#pragma GCC optimize ("O3")
+#pragma GCC optimize ("Og")
 
 #include <stdio.h>
 
@@ -145,7 +145,7 @@ typedef unsigned long      	dword;
 #endif
 
 #ifndef MAX_PATH
-  #define MAX_PATH 256
+  #define MAX_PATH 64
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

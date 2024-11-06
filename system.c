@@ -330,8 +330,6 @@ void UpdateCounters(void)
 			{
 				g_byMonitorReset = FALSE;
 				FileCloseAll();
-//			    multicore_reset_core1();
-//			    system_reset();
 			    FileSystemInit();
 			    FdcInit();
 			}
