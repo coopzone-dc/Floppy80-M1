@@ -244,11 +244,6 @@ BYTE __not_in_flash_func(FdcGetCommandType)(BYTE byCommand)
 {
 	BYTE byType = 0;
 	
-	if (g_FDC.byDriveSel == 0x0F)
-	{
-		return 2;
-	}
-
 	switch (byCommand >> 4)
 	{
 		case 0: // Restore
@@ -880,11 +875,6 @@ int FdcReadDmkSector(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 	
-	if ((nDrive == 1) && (nTrack == 3))
-	{
-		nDrive = nDrive;
-	}
-
 	if (nDrive < 0)
 	{
 		return FDC_INVALID_DRIVE;
@@ -1184,19 +1174,19 @@ void FdcMountDrive(int nDrive)
 ////////////////////////////////////////////////////////////////////////////////////
 void FdcProcessConfigEntry(char szLabel[], char* psz)
 {
-	if (strcmp(szLabel, "DRIVE0") == 0)
+	if ((strcmp(szLabel, "DRIVE0") == 0) && (MAX_DRIVES > 0))
 	{
 		CopyString(psz, g_dtDives[0].szFileName, sizeof(g_dtDives[0].szFileName)-2);
 	}
-	else if (strcmp(szLabel, "DRIVE1") == 0)
+	else if ((strcmp(szLabel, "DRIVE1") == 0) && (MAX_DRIVES > 1))
 	{
 		CopyString(psz, g_dtDives[1].szFileName, sizeof(g_dtDives[1].szFileName)-2);
 	}
-	else if (strcmp(szLabel, "DRIVE2") == 0)
+	else if ((strcmp(szLabel, "DRIVE2") == 0) && (MAX_DRIVES > 2))
 	{
 		CopyString(psz, g_dtDives[2].szFileName, sizeof(g_dtDives[2].szFileName)-2);
 	}
-	else if (strcmp(szLabel, "DRIVE3") == 0)
+	else if ((strcmp(szLabel, "DRIVE3") == 0) && (MAX_DRIVES > 3))
 	{
 		CopyString(psz, g_dtDives[3].szFileName, sizeof(g_dtDives[3].szFileName)-2);
 	}
