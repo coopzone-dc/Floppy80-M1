@@ -319,7 +319,6 @@ typedef struct {
 
 	int   nProcessFunction;
 	int   nServiceState;
-	DWORD dwStateCounter;
 	DWORD dwStateTimer;
 
 	int   nReadStatusCount;

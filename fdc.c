@@ -1405,7 +1405,7 @@ void FdcProcessSeekCommand(void)
 	{
 		FdcSetFlag(eSeekError);
 		FdcClrFlag(eBusy);
-		g_FDC.dwStateCounter   = 1;
+		g_FDC.dwStateTimer = 0;
 		g_FDC.nProcessFunction = psSeek;
 		return;
 	}
@@ -1426,7 +1426,6 @@ void FdcProcessSeekCommand(void)
 	g_FDC.byTrack = g_FDC.byData;
 	FdcClrFlag(eSeekError);
 	FdcSetFlag(eBusy);
-	g_FDC.dwStateCounter   = 100;
 	g_FDC.dwStateTimer     = 0;
 	g_FDC.nProcessFunction = psSeek;
 }
@@ -1599,7 +1598,8 @@ void FdcProcessReadSectorCommand(void)
 	}		
 	
 	g_FDC.nReadStatusCount = 0;
-	g_FDC.dwStateCounter   = 1000;
+	g_FDC.dwStateTimer     = 0;
+
 	FdcClrFlag(eDataRequest);
 
 	if (g_FDC.byCurCommand & 0x10) // read multiple
@@ -1694,7 +1694,7 @@ void FdcProcessReadAddressCommand(void)
 	g_tdTrack.nReadCount = 6;
 
 	g_FDC.nReadStatusCount = 0;
-	g_FDC.dwStateCounter   = 1000;
+	g_FDC.dwStateTimer     = 0;
 	FdcClrFlag(eDataRequest);
 
 	// number of byte to be transfered to the computer before
@@ -1884,20 +1884,19 @@ void FdcServiceReadSector(void)
 	{
 		case 0:
 			g_FDC.nReadStatusCount = 0;
-			g_FDC.dwStateCounter = 5;
+			g_FDC.dwStateTimer     = 0;
 			++g_FDC.nServiceState;
 			break;
 
 		case 1: // give host time to get ready for data
-			if (g_FDC.dwStateCounter > 0)
+			if (g_FDC.dwStateTimer < 1000) // 1ms
 			{
-				--g_FDC.dwStateCounter;
 				break;
 			}
 
 			FdcSetRecordType(g_FDC.byRecordMark);
 			FdcGenerateDRQ();
-			g_FDC.dwStateCounter = 5;
+			g_FDC.dwStateTimer = 0;
 			++g_FDC.nServiceState;
 			break;
 
@@ -1923,20 +1922,19 @@ void FdcServiceReadTrack(void)
 	{
 		case 0:
 			g_FDC.nReadStatusCount = 0;
-			g_FDC.dwStateCounter = 5;
+			g_FDC.dwStateTimer     = 0;
 			++g_FDC.nServiceState;
 			break;
 
 		case 1: // give host time to get ready for data
-			if (g_FDC.dwStateCounter > 0)
+			if (g_FDC.dwStateTimer < 1000) // 1ms
 			{
-				--g_FDC.dwStateCounter;
 				break;
 			}
 
 			FdcSetRecordType(g_FDC.byRecordMark);
 			FdcGenerateDRQ();
-			g_FDC.dwStateCounter = 5;
+			g_FDC.dwStateTimer = 0;
 			++g_FDC.nServiceState;
 			break;
 
@@ -2081,9 +2079,8 @@ void FdcServiceWriteSector(void)
 	switch (g_FDC.nServiceState)
 	{
 		case 0:
-			if ((g_FDC.nReadStatusCount < 25) && (g_FDC.dwStateCounter > 0))
+			if ((g_FDC.nReadStatusCount < 25) && (g_FDC.dwStateTimer < 1000))
 			{
-				--g_FDC.dwStateCounter;
 				break;
 			}
 
@@ -2107,13 +2104,12 @@ void FdcServiceWriteSector(void)
 			WriteSectorData(g_stSector.nSector);
 		
 			++g_FDC.nServiceState;
-			g_FDC.dwStateCounter = 5;
+			g_FDC.dwStateTimer = 0;
 			break;
 		
 		case 2:
-			if (g_FDC.dwStateCounter > 0)
+			if (g_FDC.dwStateTimer < 1000)
 			{
-    			--g_FDC.dwStateCounter;
 				break;
 			}
 
@@ -2336,9 +2332,8 @@ void FdcServiceWriteTrack(void)
 	switch (g_FDC.nServiceState)
 	{
 		case 0:
-			if ((g_FDC.nReadStatusCount < 25) && (g_FDC.dwStateCounter > 0))
+			if ((g_FDC.nReadStatusCount < 25) && (g_FDC.dwStateTimer < 1000))
 			{
-				--g_FDC.dwStateCounter;
 				break;
 			}
 
@@ -2361,14 +2356,13 @@ void FdcServiceWriteTrack(void)
 			// flush track to SD-Card
 			FdcWriteTrack(&g_tdTrack);
 		
-			g_FDC.dwStateCounter = 5;
+			g_FDC.dwStateTimer = 0;
 			++g_FDC.nServiceState;
 			break;
 
 		case 2:
-			if (g_FDC.dwStateCounter > 0)
+			if (g_FDC.dwStateTimer < 1000)
 			{
-				--g_FDC.dwStateCounter;
 				break;
 			}
 
@@ -2398,9 +2392,8 @@ void FdcServiceSeek(void)
 // primary data transfer is handled in fdc_isr()
 void FdcServiceSendData(void)
 {
-	if (g_FDC.dwStateCounter > 0) // don't wait forever
+	if (g_FDC.dwStateTimer < 1000) // don't wait forever
 	{
-		--g_FDC.dwStateCounter;
 		return;
 	}
 
