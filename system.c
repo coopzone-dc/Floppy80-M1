@@ -322,17 +322,19 @@ void UpdateCounters(void)
 
 	if (g_byResetActive)
 	{
-		if (g_byMonitorReset)
-		{
-			g_dwResetCount = CountUp(g_dwResetCount, nDiff);
+		g_dwResetCount = CountUp(g_dwResetCount, nDiff);
 
-			if (g_dwResetCount >= g_dwResetTime) // ~ 1ms duration
-			{
-				g_byMonitorReset = FALSE;
-				FileCloseAll();
-			    FileSystemInit();
-			    FdcInit();
-			}
+		if ((g_dwResetCount >= 1000) && g_byMonitorReset) // 1ms
+		{
+			g_byMonitorReset = FALSE;
+			FileCloseAll();
+			FileSystemInit();
+			FdcInit();
+		}
+		else if (g_dwResetCount >= 1000000) // 1s
+		{
+			multicore_reset_core1();
+			system_reset();
 		}
 	}
 	else
