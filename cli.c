@@ -39,6 +39,7 @@ void InitCli(void)
 void ListFiles(char* pszFilter)
 {
     FRESULT fr;  // Return value
+    int nCol = 0;
 
     memset(&dj, 0, sizeof(dj));
     memset(&fno, 0, sizeof(fno));
@@ -54,7 +55,17 @@ void ListFiles(char* pszFilter)
 		{
 			if ((pszFilter[0] == 0) || (stristr(fno.fname, pszFilter) != NULL))
 			{
-				puts(fno.fname);
+                ++nCol;
+
+    			if (nCol < 4)
+				{
+                    printf("%s\t", fno.fname);
+                }
+                else
+                {
+    				puts(fno.fname);
+                    nCol = 0;
+                }
 			}
 		}
 
