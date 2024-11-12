@@ -13,7 +13,7 @@
 #include "fdc.h"
 #include "sd_core.h"
 
-#define ENABLE_LOGGING 1
+//#define ENABLE_LOGGING 1
 //#pragma GCC optimize ("O0")
 
 ////////////////////////////////////////////////////////////////////////////////////
