@@ -2,57 +2,65 @@
 ; fdc.asm -- Floppy-80 Utility
 ;
 
-LLEN:         equ 80		; file buffer line length
-NLINES:       equ 10		; number of lines in file/text buffer
-PARMSIZE:     equ 64
-STACKSIZE:    equ 256
-CMDLINE_SIZE: equ 80
+@key	equ	1
+@dsp	equ	2
+
+; Model 4 SVCs
+@fspec	equ 78
+@init	equ 58
+@open	equ 59
+@close	equ 60
+@read	equ 67
+@write	equ 75
+@exit	equ 22
+@put	equ 4
+
+LLEN	 equ 80		; file buffer line length
+NLINES	 equ 10		; number of lines in file/text buffer
+PARMSIZE equ 64
 
 ; Floppy-80 command codes
-GETSTAUS_CMD:  equ 1
-FINDALL_CMD:   equ 2
-FINDNEXT_CMD:  equ 3
-MOUNT_CMD:     equ 4
-OPENFILE_CMD:  equ 5
-READFILE_CMD:  equ 6
-WRITEFILE_CMD: equ 7
-CLOSEFILE_CMD: equ 8
-SETTIME_CMD:   equ 9
-GETTIME_CMD:   equ 10
+GETSTAUS_CMD  equ 1
+FINDALL_CMD   equ 2
+FINDNEXT_CMD  equ 3
+MOUNT_CMD     equ 4
+OPENFILE_CMD  equ 5
+READFILE_CMD  equ 6
+WRITEFILE_CMD equ 7
+CLOSEFILE_CMD equ 8
+SETTIME_CMD   equ 9
+GETTIME_CMD   equ 10
 
-FINDINI_CMD:   equ 80h
-FINDDMK_CMD:   equ 81h
-FINDHFE_CMD:   equ 82h
+FINDINI_CMD   equ 80h
+FINDDMK_CMD   equ 81h
+FINDHFE_CMD   equ 82h
 
-REQUEST_ADDR:  equ 3000h
-RESPONSE_ADDR: equ 3200h
-
-BDOS_CMDLINE1:  equ 0xE607	; Lifeboat CP/M 1.14
-BDOS_CMDLINE2:  equ 0xE807	; FMG CP/M 1.5
+REQUEST_ADDR  equ 3000h
+RESPONSE_ADDR equ 3200h
 
 ; to detect equality of a value in A
 ;	cp	<whatever>
 ;	jr	c,testFailed   ; A was less than <whatever>.
 ;	jr	z,testFailed   ; A was exactly equal to <whatever>.
 
-BDOS:	equ	0x4205
-CONS:	equ	1
-TYPEF:	equ	2
-PRINTF:	equ	9	;BUFFER PRINT ENTRY
+	org	$5200
 
-	org	0x4300
 start:
-	ld	hl,0
-	add	hl,sp
-	ld	sp,mystack
-	push	hl
+	; detect model (0=Model 3; 1=Model 4;)
+	ld	a,(000ah)	; Model 4?
+	cp	40h
+	jr	z,not4
 
-	; copy BDOS cmd line to program cmd line buffer
-	call	get_cmdline
+	ld	a,1
+	ld	(model),a
+	jp	gotid
 
-	; parse cmd line
-	ld	hl,cmdline
-	call	getparms	; HP - points to the command line
+not4:
+	ld	a,0
+	ld	(model),a
+
+gotid:
+	call	getparms
 
 	ld	a,0		; set opcode = 0 just in case
 	ld	(opcode),a
@@ -117,35 +125,6 @@ info:	call	clrscr
 	jp	exit
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; de - address of buffer to copy the command line string too
-get_cmdline:
-	; look in command line buffer 1 for 'FDC'.
-	; if found use cmd line 1; else use cmd line 2;
-	ld	hl,BDOS_CMDLINE1
-	call	strFDC
-	cp	0
-	jp	z,get_cmdline0
-	jp	get_cmdline1
-
-get_cmdline0:
-	ld	hl,BDOS_CMDLINE2
-
-get_cmdline1:
-	ld	de,cmdline
-	ld	b,(hl)
-
-get_cmdline2:
-	inc	hl
-	ld	a,(hl)
-	ld	(de),a
-	inc	de
-	djnz	get_cmdline2
-
-	ld	a,0
-	ld	(de),a
-	ret
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; request and display the status string of the Floppy-80
 getsta:
 	call	clrscr
@@ -195,10 +174,10 @@ import:
 	call	fspec
 
 	; check for an error
-	jp	z,import1
+	jz	import1
 	ld	hl,imperr1
 	call	print
-	jp	exit
+	jmp	exit
 
 import1:
 	; open the file
@@ -286,67 +265,67 @@ impdone:
 ; de - address of the File Control Block (FCB) to be initialized
 ; lh - address of file specification
 fspec:
-;	ld	a,(model)
-;	or	a
-;	jr	z,fspec3	; 0 => model 3
-;	dec	a
-;	jr	z,fspec4	; 1 => model 4
-;	dec	a
-;	jp	nz,$40
-;
-;fspec3:
-;	call	441ch
-;	ret
-;
-;fspec4:
-;	; for model 4
-;	ld	a,@fspec
-;	rst	$28
+	ld	a,(model)
+	or	a
+	jr	z,fspec3	; 0 => model 3
+	dec	a
+	jr	z,fspec4	; 1 => model 4
+	dec	a
+	jp	nz,$40
+
+fspec3:
+	call	441ch
+	ret
+
+fspec4:
+	; for model 4
+	ld	a,@fspec
+	rst	$28
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; de - address of File Control Block (FCB) for the file
 ; hl - address of buffer to be used when accessing the file
 finit:
-;	ld	a,(model)
-;	or	a
-;	jr	z,finit3	; 0 => model 3
-;	dec	a
-;	jr	z,finit4	; 1 => model 4
-;	dec	a
-;	jp	nz,$40
-;
-;finit3:
-;	ld	b,1
-;	call	4420h
-;	ret
-;
-;finit4:
-;	; for model 4
-;	ld	a,@init
-;	ld	b,1		; 1-byte record size
-;	rst	$28
+	ld	a,(model)
+	or	a
+	jr	z,finit3	; 0 => model 3
+	dec	a
+	jr	z,finit4	; 1 => model 4
+	dec	a
+	jp	nz,$40
+
+finit3:
+	ld	b,1
+	call	4420h
+	ret
+
+finit4:
+	; for model 4
+	ld	a,@init
+	ld	b,1		; 1-byte record size
+	rst	$28
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; de - address of File Control Block (FCB) of file to close.
 fclose:
-;	ld	a,(model)
-;	or	a
-;	jr	z,fclose3	; 0 => model 3
-;	dec	a
-;	jr	z,fclose4	; 1 => model 4
-;	dec	a
-;	jp	nz,$40
-;
-;fclose3:
-;	call	4428h
-;	ret
-;
-;fclose4:
-;	; for model 4
-;	ld	a,@close
-;	rst	$28
+	ld	a,(model)
+	or	a
+	jr	z,fclose3	; 0 => model 3
+	dec	a
+	jr	z,fclose4	; 1 => model 4
+	dec	a
+	jp	nz,$40
+
+fclose3:
+	call	4428h
+	ret
+
+fclose4:
+	; for model 4
+	ld	a,@close
+	rst	$28
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -354,29 +333,29 @@ fclose:
 ; de - contains the address of the fcb
 ; hl - contains the address of the bytes to write
 fwrite:
-;	ld	a,(model)
-;	or	a
-;	jr	z,fwrite3	; 0 => model 3
-;	dec	a
-;	jr	z,fwrite4	; 1 => model 4
-;	dec	a
-;	jp	nz,$40
-;
-;fwrite3:
-;	ld	c,(hl)
-;	call	4439h
-;	inc	hl
-;	djnz	fwrite3
-;
-;	ret
-;
-;fwrite4:
-;	; for model 4
-;	ld	a,@put
-;	ld	c,(hl)
-;	rst	$28
-;	inc	hl
-;	djnz	fwrite4
+	ld	a,(model)
+	or	a
+	jr	z,fwrite3	; 0 => model 3
+	dec	a
+	jr	z,fwrite4	; 1 => model 4
+	dec	a
+	jp	nz,$40
+
+fwrite3:
+	ld	c,(hl)
+	call	4439h
+	inc	hl
+	djnz	fwrite3
+
+	ret
+
+fwrite4:
+	; for model 4
+	ld	a,@put
+	ld	c,(hl)
+	rst	$28
+	inc	hl
+	djnz	fwrite4
 
 	ret
 
@@ -551,7 +530,7 @@ getlist30:
 	; test if a valid selection
 
 	; if a < '1' then go around again
-	cp	'1'
+	cp	a,'1'
 	jr	c,getnextset
 
 	; if a > (found) then go around again
@@ -559,7 +538,7 @@ getlist30:
 	add	a,'0'
 	ld	b,a		; b = highest available selection
 	ld	a,(select)	; a = user input
-	cp	b
+	cp	a,b
 	jr	c,mount
 	jr	z,mount
 	jp	getnextset
@@ -580,7 +559,7 @@ mount1:	call	getchar
 
 	; validate drive selection
 	; if (a < '0') then try again
-	cp	'0'
+	cp	a,'0'
 	jr	c,mount1
 
 	; if (a > '2') then try again
@@ -609,7 +588,7 @@ getlist40:
 ; (drive)  - memory location contains the index of the drive selection ('0'-'3')
 ;
 setparms:
-	push	af
+	push	a
 	push	hl
 	push	de
 
@@ -635,7 +614,7 @@ setparms:
 
 	pop	de
 	pop	hl
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -649,7 +628,7 @@ setparms:
 ; parm2 - contains the filename.ext
 ;
 mountfile:
-	push	af
+	push	a
 	push	hl
 	push	de
 
@@ -682,12 +661,12 @@ mountfile:
 
 	pop	de
 	pop	hl
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; return HL = DE * A
-Mul8:	push	bc
+Mul8:	push	b
 	ld	hl,0		; HL is used to accumulate the result
 	ld	b,8		; the multiplier (A) is 8 bits wide
 Mul8Loop:
@@ -698,7 +677,7 @@ Mul8Skip:
 	sla	e		; calculating the next auxiliary product by shifting
 	rl	d		; DE one bit leftwards (refer to the shift instructions!)
 	djnz	Mul8Loop
-	pop	bc
+	pop	b
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -708,7 +687,7 @@ Mul8Skip:
 ; HL - points to the string
 ;
 skipblanks:
-	push	af
+	push	a
 skipblanks1:
 	ld	a,(hl)
 	cp	32		; space
@@ -717,7 +696,7 @@ skipblanks1:
 	jr	skipblanks1
 
 skipblanks2:
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -727,7 +706,7 @@ skipblanks2:
 ; HL - points to the string
 ;
 skiptoblank:
-	push	af
+	push	a
 skiptoblank1:
 	ld	a,(hl)
 
@@ -741,57 +720,7 @@ skiptoblank1:
 	jr	skiptoblank1
 
 skiptoblank2:
-	pop	af
-	ret
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; searches a string for the occurance of 'FDC'
-;
-; Parameters:
-;	HL - pointer to string to search
-;
-; Returns:
-;	a = 0 if string not found
-;         = 1 if string was found
-;
-strFDC:
-	push	hl
-	ld	b,8	; maximum number of characters to scan
-
-	; copy string until null is detected
-strFDC1:
-	inc	hl
-	ld	a,(hl)
-	call	toupper
-	cp	'F'
-	jr	z,strFDC2
-	djnz	strFDC1
-	ld	a,0
-	jp	strFDC_Exit
-
-strFDC2:
-	inc	hl
-	ld	a,(hl)
-	call	toupper
-	cp	'D'
-	jr	z,strFDC3
-	ld	a,0
-	jp	strFDC_Exit
-
-strFDC3:
-	inc	hl
-	ld	a,(hl)
-	call	toupper
-	cp	'C'
-	jr	z,strFDC4
-	ld	a,0
-	jp	strFDC_Exit
-
-strFDC4:
-	ld	a,1
-
-strFDC_Exit:
-	pop	hl
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -807,7 +736,7 @@ strFDC_Exit:
 ;	HL - last location of source accessed (points to the null)
 ;	DE - last location of destingation accessed (points to the null)
 ;
-strcpy:	push	af
+strcpy:	push	a
 	push	hl
 	push	de
 
@@ -822,7 +751,7 @@ strcpy1:
 
 	pop	de
 	pop	hl
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -830,7 +759,7 @@ strcpy1:
 ;	HL - source
 ;	DE - destination
 ;
-strcat:	push	af
+strcat:	push	a
 	push	hl
 	push	de
 
@@ -853,7 +782,7 @@ strcat2:
 
 	pop	de
 	pop	hl
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -864,7 +793,7 @@ strcat2:
 ;
 ; return: b - contains the length of the string
 ;
-strlen:	push	af
+strlen:	push	a
 	push	hl
 	ld	b,255
 
@@ -877,7 +806,7 @@ strlen1:
 	jr	nz,strlen1
 
 	pop	hl
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -967,19 +896,14 @@ getparms:
 	pop	hl
 
 	; (hl) points to the command line options
-	ld	de,parm0
-	call	copyparm
-	cp	0		; if CR then no more paramters
-	jr	z,getparms1
-
 	ld	de,parm1
 	call	copyparm
-	cp	0		; if CR then no more paramters
+	cp	a,13		; if CR then no more paramters
 	jr	z,getparms1
 
 	ld	de,parm2
 	call	copyparm
-	cp	0		; if CR then no more paramters
+	cp	a,13		; if CR then no more paramters
 	jr	z,getparms1
 
 	ld	de,parm3
@@ -1016,6 +940,7 @@ memset1:
 ;	a - contains the parameter termination charcter
 ;
 copyparm:
+	push	hl
 	push	de
 copyparm1:
 	ld	a,(hl)
@@ -1031,15 +956,16 @@ copyparm1:
 	jr	copyparm1
 
 copyparm2:
-	push	af
+	push	a
 
 	; null terminate (space to null or CR to null)
 	dec	de
 	ld	a,0
 	ld	(de),a
 
-	pop	af
+	pop	a
 	pop	de
+	pop	hl
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1147,7 +1073,7 @@ readdata:
 	ld	de,RESPONSE_ADDR
 	ld	a,(de)
 
-	push	af
+	push	a
 	ld	b,a
 
 	; test for zero length data/string
@@ -1170,7 +1096,7 @@ readdata1:
 	ld	(hl),a
 
 readdata2:
-	pop	af
+	pop	a
 	pop	de
 	pop	hl
 	ret
@@ -1183,7 +1109,7 @@ readdata2:
 ;	b  - contains the number of bytes to be written
 ;
 writedata:
-	push	af
+	push	a
 	push	hl
 	push	de
 
@@ -1198,23 +1124,23 @@ writedata1:
 
 	pop	de
 	pop	hl
-	pop	af
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; just waste some time
-delay:	push	bc
+delay:	push	b
 	ld	b,0
 dly:	djnz	dly
-	pop	bc
+	pop	b
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; wait for the Floppy80-M1 request to complete (mem(REQUEST_ADDR) == 0)
 ; times out if mem(REQUEST_ADDR) != 0 after 256 times through loop
 wait_for_ready:
-	push	af
-	push	bc
+	push	a
+	push	b
 	push    hl
 
 	ld	b,0
@@ -1227,8 +1153,8 @@ wnb2:	call	delay		; give Floppy-80 time to do its thing
 	djnz	wnb1		; time out after 256 loops
 
 wnb3:	pop	hl
-	pop	bc
-	pop	af
+	pop	b
+	pop	a
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1240,17 +1166,8 @@ clrscr:	push	hl
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; A - character to display.
-putc:
-	push	de
-	push	hl
-	push	bc
-
-	ld	c,TYPEF
-	ld	e,a
-	call	BDOS
-
-	pop	bc
-	pop	hl
+putc:	push	de
+	call	$33
 	pop	de
 	ret
 
@@ -1261,9 +1178,7 @@ print1:	ld	a,(hl)
 	inc	hl
 	or	a
 	jr	z,print_end
-
 	call	putc
-
 	jr	print1
 print_end:
 	pop	hl
@@ -1276,74 +1191,76 @@ print_end:
 ;	a - contains the character associated with the user key press.
 ;
 getchar:
-	ld	c,CONS
-	call	BDOS
+	push	de
+getchar3:
+	ld	de,4015H
+	call	13H
+	or	a
+	jz	getchar3
+
+	pop	de
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-exit:
-	pop	hl
-	ld	sp,hl
+exit:	ld	hl,0
+	call	402dh
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-intro:		db	'Model I FDC utility version 0.0.6',13,10
-		db	'Command line options:',13,10
-		db	'STA - get status (firmware version, mounted disks, etc.).',13,10
-;		ascii	'SET - set FDC date and time to the TRS-80 date and time.',13,10
-;		ascii	'GET - set TRS-80 date and time to the FDC date and time.',13,10
-;		ascii	'DIR - get a directory listing of the FDC SD-Card root folder.',13,10
-		db	'INI - select the default ini file.    FDC INI filename.ext',13,10
-		db	'DMK - mount a DMK disk image.         FDC DMK filename.ext n',13,10
-		db	'HFE - mount a HFE disk image.         FDC HFE filename.ext n',13,10
-		db      'IMP - import a file from the SD-Card. FDC IMP filename/ext:n',13,10
-;		ascii	'EXP - export a file to the SD-card.   FDC EXP filename/ext:n',13,10
-		db	' ',13,10
-		db	'      filename.ext - is the filename and extension.',13,10
-		db	'      n - is the drive number (0-2).',13,10,0
+intro:
+		ascii	'Model I FDC utility version 0.0.7',13
+		ascii	'Command line options:',13
+		ascii	'STA - get status (firmware version, mounted disks, etc.).',13
+;		ascii	'SET - set FDC date and time to the TRS-80 date and time.',13
+;		ascii	'GET - set TRS-80 date and time to the FDC date and time.',13
+;		ascii	'DIR - get a directory listing of the FDC SD-Card root folder.',13
+		ascii	'INI - select the default ini file.    FDC INI filename.ext',13
+		ascii	'DMK - mount a DMK disk image.         FDC DMK filename.ext n',13
+;		ascii	'HFE - mount a HFE disk image.         FDC HFE filename.ext n',13
+;		ascii   'IMP - import a file from the SD-Card. FDC IMP filename/ext:n',13
+;		ascii	'EXP - export a file to the SD-card.   FDC EXP filename/ext:n',13
+		ascii	' ',13
+		ascii	'      filename.ext - is the filename and extension.',13
+		ascii	'      n - is the drive number (0-2).',13,0
 
-error1:		db	'Error: drive index not specified on command line',13,13,0
-imperr1:	db	'Error: invalid file specification',13,13,0
-imperr2:	db	'Error: unable to open the specified file',13,13,0
+error1:		ascii	'Error: drive index not specified on command line',13,13,0
+imperr1:	ascii	'Error: invalid file specification',13,13,0
+imperr2:	ascii	'Error: unable to open the specified file',13,13,0
 
-cscr:		db   ' ', 28, 31, 15, 0
-space:		db	' ', 0
-openr:		db	', r', 0
-openw:		db	', w', 0
+cscr:		ascii   ' ', 28, 31, 15, 0
+space:		ascii	' ', 0
+openr:		ascii	', r', 0
+openw:		ascii	', w', 0
 
-STAstr:		db	'STA',0
-INIstr:		db	'INI',0
-DMKstr:		db	'DMK',0
-HFEstr:		db	'HFE',0
-DIRstr:		db	'DIR',0
-IMPstr:		db	'IMP',0
-EXPstr:		db	'EXP',0
+STAstr:		ascii	'STA',0
+INIstr:		ascii	'INI',0
+DMKstr:		ascii	'DMK',0
+HFEstr:		ascii	'HFE',0
+DIRstr:		ascii	'DIR',0
+IMPstr:		ascii	'IMP',0
+EXPstr:		ascii	'EXP',0
 
-prompt_part1:	db	'Press 1-',0
-prompt_part2:	db	' to select the desired file.',13
-		db	'Press any other key for next set of files.',13,0
-prompt_drive:	db	'Specify drive to mount to (0-2).',13,0
-prompt_reset:	db	'Power OFF and back ON to continue.',13,0
+prompt_part1:	ascii	'Press 1-',0
+prompt_part2:	ascii	' to select the desired file.',13
+		ascii	'Press any other key for next set of files.',13,0
+prompt_drive:	ascii	'Specify drive to mount to (0-2).',13,0
+prompt_reset:	ascii	'Power OFF and back ON to continue.',13,0
 
-opcode:		ds	1		; command line operation requested (0=STA; 1=INI; 2=MNT;)
-found:		ds	1
-select:		ds	1
-drive:		ds	1
+model:		defs	1		; 0=Model 3; 1=Model 4; 2=Model II;
+opcode:		defs	1		; command line operation requested (0=STA; 1=INI; 2=MNT;)
+found:		defs	1
+select:		defs	1
+drive:		defs	1
 
-fcb:		ds	48		; 48 for Model III TRSDOS 1.3   
-fcbbuf:		ds	256
+fcb:		defs	48		; 48 for Model III TRSDOS 1.3   
+fcbbuf:		defs	256
 
-xferbuf:	ds	260		; transfer buffer
-lnbuf:		ds	NLINES*LLEN	; text buffer of NLINES lines of LLEN characters each
+xferbuf:	defs	260		; transfer buffer
+lnbuf:		defs	(NLINES*LLEN)	; text buffer of NLINES lines of LLEN characters each
 
-cmdline:	ds	CMDLINE_SIZE
-parm0:		ds	PARMSIZE
-parm1:		ds	PARMSIZE
-parm2:		ds	PARMSIZE
-parm3:		ds	PARMSIZE
+parm1:		defs	PARMSIZE
+parm2:		defs	PARMSIZE
+parm3:		defs	PARMSIZE
 
-		ds	STACKSIZE
-mystack:
-
-	end
+	end	start
  
