@@ -86,7 +86,8 @@
         "time.h": "c",
         "datetime.h": "c",
         "mutex.h": "c",
-        "util.h": "c"
+        "util.h": "c",
+        "ticks.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

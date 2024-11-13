@@ -325,8 +325,6 @@ typedef struct {
 
 	BYTE  bySdCardPresent;
 	
-	int   nDataRegReadCount;
-
 	BYTE  byTransferBuffer[256];
 	int   nTransferSize;
 	int   nTrasferIndex;

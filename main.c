@@ -108,19 +108,19 @@ void InitGPIO(void)
     gpio_init(ADDRL_OE_PIN);
     gpio_set_dir(ADDRL_OE_PIN, GPIO_OUT);
     gpio_set_slew_rate(ADDRL_OE_PIN, GPIO_SLEW_RATE_FAST);
-    gpio_set_drive_strength(ADDRL_OE_PIN, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_drive_strength(ADDRL_OE_PIN, GPIO_DRIVE_STRENGTH_12MA);
     gpio_put(ADDRL_OE_PIN, 1); // deactivate low address bus input buffer
 
     gpio_init(DATAB_OE_PIN);
     gpio_set_dir(DATAB_OE_PIN, GPIO_OUT);
     gpio_set_slew_rate(DATAB_OE_PIN, GPIO_SLEW_RATE_FAST);
-    gpio_set_drive_strength(LED_PIN, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_drive_strength(DATAB_OE_PIN, GPIO_DRIVE_STRENGTH_12MA);
     gpio_put(DATAB_OE_PIN, 1); // deactivate data bus I/O buffer
 
     gpio_init(ADDRH_OE_PIN);
     gpio_set_dir(ADDRH_OE_PIN, GPIO_OUT);
     gpio_set_slew_rate(ADDRH_OE_PIN, GPIO_SLEW_RATE_FAST);
-    gpio_set_drive_strength(LED_PIN, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_set_drive_strength(ADDRH_OE_PIN, GPIO_DRIVE_STRENGTH_12MA);
     gpio_put(ADDRH_OE_PIN, 1); // deactivate high address bus input buffer
 
     gpio_init(IN_PIN);
