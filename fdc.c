@@ -160,9 +160,24 @@ DAM marker values:
 
 */
 
+/*
+	RS Double Density Adapter
+
+	Function selection is perfomed via writes to the sector register (0x37EE)
+
+	Value		Function
+	--------------------------------
+    40-5F       Select side 0
+    60-7F       Select side 1
+    80-9F       Set double-density mode
+    A0-BF       Set single-density mode
+    C0-DF       Disable precomp
+    E0-FF       Enable precomp
+*/
+
 ////////////////////////////////////////////////////////////////////////////////////
 
-static char* g_pszVersion = {"0.0.7"};
+static char* g_pszVersion = {"0.0.9"};
 
 static FdcType       g_FDC;
 static FdcDriveType  g_dtDives[MAX_DRIVES];
@@ -2490,7 +2505,7 @@ int FdcFileListCmp(const void * a, const void * b)
 }
 
 //-----------------------------------------------------------------------------
-void FdcProcessFindFirst(char* pszFilter)
+void FdcProcessFindFirst(char* pszFilter, char* pszFolder)
 {
     FRESULT fr;  // Return value
 	int     i;
@@ -2508,7 +2523,7 @@ void FdcProcessFindFirst(char* pszFilter)
 
 	strcpy(g_szFindFilter, pszFilter);
 
-    fr = f_findfirst(&g_dj, &g_fno, "0:", "*");
+    fr = f_findfirst(&g_dj, &g_fno, pszFolder, "*");
 
     if (FR_OK != fr)
 	{
@@ -2659,8 +2674,11 @@ void FdcServiceMountImage(void)
 //-----------------------------------------------------------------------------
 void FdcFormatDrive(void)
 {
-	char buf[64];
-	int  drive = atoi(g_bFdcRequest.buf);
+	file* f;
+	char* psz;
+	char  buf[256];
+	int   drive = atoi(g_bFdcRequest.buf);
+	int   size, read;
 
 	if (!isdigit((char)g_bFdcRequest.buf[0]))
 	{
@@ -2685,6 +2703,34 @@ void FdcFormatDrive(void)
 		return;
 	}
 
+	psz = g_bFdcRequest.buf;
+	psz = SkipBlanks(psz);
+	psz = SkipToBlank(psz);
+	psz = SkipBlanks(psz);
+
+	strcpy(buf, "0:\\FMT\\");
+	strcat(buf, psz);
+
+	if (FR_OK != f_stat(buf, &g_fno))
+	{
+		strcpy((char*)(g_bFdcResponse.buf), "Unable to formatted disk image: ");
+		strcat((char*)(g_bFdcResponse.buf), buf);
+		strcat((char*)(g_bFdcResponse.buf), "\n");
+		SetResponseLength(&g_bFdcResponse);
+		return;
+	}
+
+	f = FileOpen(buf, FA_READ);
+
+	if (f == NULL)
+	{
+		strcpy((char*)(g_bFdcResponse.buf), "Unable to open file: ");
+		strcat((char*)(g_bFdcResponse.buf), buf);
+		strcat((char*)(g_bFdcResponse.buf), "\n");
+		SetResponseLength(&g_bFdcResponse);
+		return;
+	}
+
 	FileClose(g_dtDives[drive].f);
 	g_dtDives[drive].f = NULL;
 
@@ -2692,22 +2738,34 @@ void FdcFormatDrive(void)
 
 	if (g_dtDives[drive].f == NULL)
 	{
-		strcpy((char*)(g_bFdcResponse.buf), "Unable to create new DMK disk image.");
+		strcpy((char*)(g_bFdcResponse.buf), "Unable to create new DMK disk image.\n");
 		SetResponseLength(&g_bFdcResponse);
 		return;
 	}
 
-	sprintf(buf, "Formating drive %d (%s), ", drive, g_dtDives[drive].szFileName);
+	size = g_fno.fsize;
 
-	FileWrite(g_dtDives[drive].f, TD230_GetPtr(), TD230_Size());
+	while (size > 0)
+	{
+		read = sizeof(g_byTrackBuffer);
 
+		if (read > size)
+		{
+			read = size;
+		}
+
+		FileRead(f, g_byTrackBuffer, read);
+		FileWrite(g_dtDives[drive].f, g_byTrackBuffer, read);
+		size -= read;
+	}
+
+	FileClose(f);
 	FileClose(g_dtDives[drive].f);
 	g_dtDives[drive].f = NULL;
 
 	FdcMountDrive(drive);
 
-	strcat(buf, "complete.");
-	strcpy((char*)(g_bFdcResponse.buf), buf);
+	sprintf((char*)(g_bFdcResponse.buf), "Formatting drive %d (%s), complete.\n", drive, g_dtDives[drive].szFileName);
 	SetResponseLength(&g_bFdcResponse);
 }
 
@@ -2724,7 +2782,7 @@ void FdcProcessRequest(void)
             break;
 
         case 2: // find first file
-            FdcProcessFindFirst("*");
+            FdcProcessFindFirst("*", "0:");
             break;
 
         case 3: // find next file
@@ -2740,15 +2798,19 @@ void FdcProcessRequest(void)
 			break;
 
         case 0x80:
-			FdcProcessFindFirst(".INI");
+			FdcProcessFindFirst(".INI", "0:");
             break;
 
         case 0x81:
-			FdcProcessFindFirst(".DMK");
+			FdcProcessFindFirst(".DMK", "0:");
             break;
 
         case 0x82:
-			FdcProcessFindFirst(".HFE");
+			FdcProcessFindFirst(".HFE", "0:");
+            break;
+
+        case 0x83:
+			FdcProcessFindFirst(".DMK", "0:\\FMT");
             break;
     }
 }
@@ -3251,6 +3313,19 @@ void __not_in_flash_func(fdc_write_drive_select)(byte byData)
 }
 
 //-----------------------------------------------------------------------------
+void __not_in_flash_func(fdc_put_response_byte)(word addr, byte data)
+{
+	if (addr < FDC_CMD_SIZE)
+	{
+		g_bFdcResponse.cmd[addr] = data;
+	}
+	else
+	{
+		g_bFdcResponse.buf[addr-FDC_CMD_SIZE] = data;
+	}
+}
+
+//-----------------------------------------------------------------------------
 byte __not_in_flash_func(fdc_get_response_byte)(word addr)
 {
 	if (addr < FDC_CMD_SIZE)
@@ -3273,5 +3348,18 @@ void __not_in_flash_func(fdc_put_request_byte)(word addr, byte data)
 	else
 	{
 		g_bFdcRequest.buf[addr-FDC_CMD_SIZE] = data;
+	}
+}
+
+//-----------------------------------------------------------------------------
+byte __not_in_flash_func(fdc_get_request_byte)(word addr)
+{
+	if (addr < FDC_CMD_SIZE)
+	{
+		return g_bFdcRequest.cmd[addr];
+	}
+	else
+	{
+		return g_bFdcRequest.buf[addr-FDC_CMD_SIZE];
 	}
 }

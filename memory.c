@@ -8,8 +8,7 @@
 #include "defines.h"
 #include "fdc.h"
 
-//#define NopDelay() __nop(); __nop(); __nop(); __nop(); __nop(); __nop(); __nop(); __nop();
-#define NopDelay() __nop(); __nop(); __nop(); __nop(); __nop();
+#define NopDelay() __nop(); __nop(); __nop(); __nop(); __nop(); __nop();
 
 static byte by_memory[0x8000];
 
@@ -45,6 +44,11 @@ void __not_in_flash_func(ServiceFdcResponseOperation)(word addr)
         data = fdc_get_response_byte(addr);
         FinishReadOperation(data);
     }
+    else if (!get_gpio(WR_PIN))
+    {
+        addr -= FDC_RESPONSE_ADDR_START;
+        fdc_put_response_byte(addr, data);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -63,7 +67,13 @@ void __not_in_flash_func(ServiceFdcRequestOperation)(word addr)
     // wait for RD or WR to go active or MREQ to go inactive
     while (get_gpio(RD_PIN) && get_gpio(WR_PIN) && !get_gpio(MREQ_PIN));
 
-    if (!get_gpio(WR_PIN))
+    if (!get_gpio(RD_PIN))
+    {
+        addr -= FDC_REQUEST_ADDR_START;
+        data = fdc_get_request_byte(addr);
+        FinishReadOperation(data);
+    }
+    else if (!get_gpio(WR_PIN))
     {
         addr -= FDC_REQUEST_ADDR_START;
         fdc_put_request_byte(addr, data);
@@ -251,11 +261,6 @@ void __not_in_flash_func(ServiceFdcDataOperation)(void)
     }
 }
 
-// uint32_t max = 0;
-// uint32_t start = 0;
-// uint32_t end = 0;
-// uint32_t duration = 0;
-
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(service_memory)(void)
 {
@@ -292,13 +297,11 @@ void __not_in_flash_func(service_memory)(void)
         // saves time after MREQ goes low
         clr_gpio(ADDRL_OE_PIN);
         NopDelay();
-        addr.b[0] = get_gpio_data_byte();
 
         // wait for MREQ to go active, reading low address byte while waiting
-        while (get_gpio(MREQ_PIN))
-        {
+        do {
             addr.b[0] = get_gpio_data_byte();
-        }
+        } while (get_gpio(MREQ_PIN));
 
         set_gpio(ADDRL_OE_PIN);
 
@@ -322,6 +325,7 @@ void __not_in_flash_func(service_memory)(void)
 
         if (addr.w >= 0x8000)
         {
+            set_gpio(WAIT_PIN);
             ServiceHighMemoryOperation(addr.w);
         }
         else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF))
@@ -356,19 +360,16 @@ void __not_in_flash_func(service_memory)(void)
         }
         else if ((addr.w >= FDC_REQUEST_ADDR_START) && (addr.w <= FDC_REQUEST_ADDR_STOP))
         {
+            set_gpio(WAIT_PIN);
             ServiceFdcRequestOperation(addr.w);
         }
         else if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP))
         {
+            set_gpio(WAIT_PIN);
             ServiceFdcResponseOperation(addr.w);
         }
 
     	// end = systick_hw->cvr;
         // duration = (start & 0x00FFFFFF) - (end & 0x00FFFFFF);
-
-        // if ((duration < 0x1000) && (duration > max))
-        // {
-        //     max = duration;
-        // }
    }
 }

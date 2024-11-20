@@ -16,12 +16,12 @@ extern "C" {
 #define NUM_BLOCKS 32
 #define MAX_TRACK_SIZE (BLOCK_SIZE*NUM_BLOCKS)
 
-                             /* Common status bits:               */
+                            /* Common status bits:               */
 #define F_BUSY      0x01    /* Controller is executing a command */
 #define F_READONLY  0x40    /* The disk is write-protected       */
 #define F_NOTREADY  0x80    /* The drive is not ready            */
 
-                             /* Type-1 command status:            */
+                            /* Type-1 command status:            */
 #define F_INDEX     0x02    /* Index mark detected               */
 #define F_TRACK0    0x04    /* Head positioned at track #0       */
 #define F_CRCERR    0x08    /* CRC error in ID field             */
@@ -30,7 +30,7 @@ extern "C" {
 #define F_PROTECTED 0x40    /* write protected                   */
 #define F_NOTREADY  0x80    /* Drive not ready, drive missing    */
 
-                             /* Type-2 and Type-3 command status: */
+                            /* Type-2 and Type-3 command status: */
 #define F_DRQ       0x02    /* Data request pending              */
 #define F_LOSTDATA  0x04    /* Data has been lost (missed DRQ)   */
 #define F_ERRCODE   0x18    /* Error code bits:                  */
@@ -94,7 +94,6 @@ extern "C" {
 #define FDC_CRC_ERROR 1
 #define FDC_INVALID_DRIVE 2
 #define FDC_SECTOR_NOT_FOUND 3
-
 
 /* global variable declarations ==========================================*/
 
@@ -336,7 +335,7 @@ typedef struct {
 #define FDC_REQUEST_ADDR_STOP  (FDC_REQUEST_ADDR_START+FDC_REQUEST_SIZE-1)
 
 #define FDC_RESPONSE_SIZE 0x200
-#define FDC_RESPONSE_ADDR_START (FDC_REQUEST_ADDR_START+FDC_RESPONSE_SIZE)
+#define FDC_RESPONSE_ADDR_START (FDC_REQUEST_ADDR_START+FDC_REQUEST_SIZE)
 #define FDC_RESPONSE_ADDR_STOP  (FDC_RESPONSE_ADDR_START+FDC_RESPONSE_SIZE-1)
 
 #pragma pack(push)  /* push current alignment to stack */
@@ -386,8 +385,10 @@ byte fdc_read_data(void);
 void fdc_write_drive_select(byte byData);
 void fdc_process_command_request(byte by);
 
+void fdc_put_response_byte(word addr, byte data);
 byte fdc_get_response_byte(word addr);
 void fdc_put_request_byte(word addr, byte data);
+byte fdc_get_request_byte(word addr);
 
 #ifdef __cplusplus
 }

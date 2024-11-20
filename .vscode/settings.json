@@ -89,5 +89,5 @@
         "util.h": "c",
         "ticks.h": "c"
     },
-    "cortex-debug.variableUseNaturalFormat": false
+    "cortex-debug.variableUseNaturalFormat": true
 }

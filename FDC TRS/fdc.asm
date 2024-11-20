@@ -2,19 +2,6 @@
 ; fdc.asm -- Floppy-80 Utility
 ;
 
-@key	equ	1
-@dsp	equ	2
-
-; Model 4 SVCs
-@fspec	equ 78
-@init	equ 58
-@open	equ 59
-@close	equ 60
-@read	equ 67
-@write	equ 75
-@exit	equ 22
-@put	equ 4
-
 LLEN	 equ 80		; file buffer line length
 NLINES	 equ 10		; number of lines in file/text buffer
 PARMSIZE equ 64
@@ -35,6 +22,7 @@ FORMAT_CMD    equ 11
 FINDINI_CMD   equ 80h
 FINDDMK_CMD   equ 81h
 FINDHFE_CMD   equ 82h
+FINDFMT_CMD   equ 83h
 
 REQUEST_ADDR  equ 3000h
 RESPONSE_ADDR equ 3200h
@@ -47,6 +35,12 @@ RESPONSE_ADDR equ 3200h
 	org	$5200
 
 start:
+	ld	a,0
+	ld	(RESPONSE_ADDR),a
+	ld	(RESPONSE_ADDR+1),a
+	ld	(REQUEST_ADDR),a
+	ld	(REQUEST_ADDR+1),a
+
 	; detect model (0=Model 3; 1=Model 4;)
 	ld	a,(000ah)	; Model 4?
 	cp	40h
@@ -65,6 +59,8 @@ gotid:
 
 	ld	a,0		; set opcode = 0 just in case
 	ld	(opcode),a
+
+	call	clrscr
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	; test for STA command line parmameter
@@ -123,7 +119,9 @@ gotid5:
 	ld	de,FORstr
 	call	striequ
 	jr	nz,gotid6
-	jp	format
+	ld	a,FINDFMT_CMD	; find .dmk files in FMT folder
+	ld	(opcode),a
+	jp	getlist
 
 gotid6:
 
@@ -137,8 +135,6 @@ info:	call	clrscr
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; request and display the status string of the Floppy-80
 getsta:
-	call	clrscr
-
 	; set response length to 0
 	ld	a,0
 	ld	hl,RESPONSE_ADDR
@@ -168,39 +164,6 @@ getsta_loop:
 
 getsta_exit:
 	jp	exit
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; parm2 - points to command line option 2 (drive number)
-format:
-	push	a
-	push	hl
-	push	de
-
-	; build command string in xferbuf
-	; '0 type' (replace 0 with desired drive number)
-	ld	hl,parm2
-	ld	de,xferbuf
-	call	strcpy
-
-	ld	hl,xferbuf
-	call	strlen
-	call	writedata	; hl - points to the data to be written
-				; b  - contains the number of bytes to be written
-
-	ld	a,FORMAT_CMD	; format command
-	ld	hl,REQUEST_ADDR
-	ld	(hl),a
-
-	call	wait_for_ready
-
-	; display status response
-	ld	hl,RESPONSE_ADDR+2
-	call	print
-
-	pop	de
-	pop	hl
-	pop	a
-	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; parm2 - points to command line option 2 (the file name)
@@ -308,67 +271,21 @@ impdone:
 ; de - address of the File Control Block (FCB) to be initialized
 ; lh - address of file specification
 fspec:
-	ld	a,(model)
-	or	a
-	jr	z,fspec3	; 0 => model 3
-	dec	a
-	jr	z,fspec4	; 1 => model 4
-	dec	a
-	jp	nz,$40
-
-fspec3:
 	call	441ch
-	ret
-
-fspec4:
-	; for model 4
-	ld	a,@fspec
-	rst	$28
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; de - address of File Control Block (FCB) for the file
 ; hl - address of buffer to be used when accessing the file
 finit:
-	ld	a,(model)
-	or	a
-	jr	z,finit3	; 0 => model 3
-	dec	a
-	jr	z,finit4	; 1 => model 4
-	dec	a
-	jp	nz,$40
-
-finit3:
 	ld	b,1
 	call	4420h
-	ret
-
-finit4:
-	; for model 4
-	ld	a,@init
-	ld	b,1		; 1-byte record size
-	rst	$28
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; de - address of File Control Block (FCB) of file to close.
 fclose:
-	ld	a,(model)
-	or	a
-	jr	z,fclose3	; 0 => model 3
-	dec	a
-	jr	z,fclose4	; 1 => model 4
-	dec	a
-	jp	nz,$40
-
-fclose3:
 	call	4428h
-	ret
-
-fclose4:
-	; for model 4
-	ld	a,@close
-	rst	$28
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -376,29 +293,10 @@ fclose4:
 ; de - contains the address of the fcb
 ; hl - contains the address of the bytes to write
 fwrite:
-	ld	a,(model)
-	or	a
-	jr	z,fwrite3	; 0 => model 3
-	dec	a
-	jr	z,fwrite4	; 1 => model 4
-	dec	a
-	jp	nz,$40
-
-fwrite3:
 	ld	c,(hl)
 	call	4439h
 	inc	hl
-	djnz	fwrite3
-
-	ret
-
-fwrite4:
-	; for model 4
-	ld	a,@put
-	ld	c,(hl)
-	rst	$28
-	inc	hl
-	djnz	fwrite4
+	djnz	fwrite
 
 	ret
 
@@ -616,11 +514,62 @@ mount2:	ld	(parm3),a
 	ld	(parm3+1),a
 
 	call	setparms
+
+	ld	a,(opcode)
+	cp	FINDFMT_CMD
+	jr	z,do_format
+
 	call	mountfile
 	jp	getsta
 
+do_format:
+	call	format
+
 getlist40:
 	jp	exit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; parm2 - points to command line option 2 (drive number)
+format:
+	push	a
+	push	hl
+	push	de
+
+	; build command string in xferbuf
+	; '0 filename.ext' (replace 0 with desired drive number)
+	ld	hl,parm3
+	ld	de,xferbuf
+	call	strcpy
+
+	; add space
+	ld	hl,space
+	ld	de,xferbuf
+	call	strcat
+
+	; add parm2
+	ld	hl,parm2
+	ld	de,xferbuf
+	call	strcat
+
+	ld	hl,xferbuf
+	call	strlen
+	call	writedata	; hl - points to the data to be written
+				; b  - contains the number of bytes to be written
+
+	ld	a,FORMAT_CMD	; format command
+	ld	hl,REQUEST_ADDR
+	ld	(hl),a
+
+	call	wait_for_ready
+
+	; display status response
+	ld	hl,RESPONSE_ADDR+2
+	call	print
+
+	pop	de
+	pop	hl
+	pop	a
+	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; initializes parm1, parm2 and parm3 based on user selection to be
@@ -1177,6 +1126,15 @@ dly:	djnz	dly
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; just waste some time
+delay2:	push	b
+	ld	b,20
+dly2:	call	delay
+	djnz	dly2
+	pop	b
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; wait for the Floppy80-M1 request to complete (mem(REQUEST_ADDR) == 0)
 ; times out if mem(REQUEST_ADDR) != 0 after 256 times through loop
 wait_for_ready:
@@ -1186,11 +1144,11 @@ wait_for_ready:
 
 	ld	b,0
 
-wnb1:	ld	hl,REQUEST_ADDR
-	ld	a,(hl)
-	jr	nz,wnb3
+wnb1:	ld	a,(REQUEST_ADDR)
+	cp	0
+	jr	z,wnb3
 
-wnb2:	call	delay		; give Floppy-80 time to do its thing
+wnb2:	call	delay2		; give Floppy-80 time to do its thing
 	djnz	wnb1		; time out after 256 loops
 
 wnb3:	pop	hl
@@ -1249,7 +1207,7 @@ exit:	ld	hl,0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 intro:
-		ascii	'Model I FDC utility version 0.0.7',13
+		ascii	'Model I FDC utility version 0.0.9',13
 		ascii	'Command line options:',13
 		ascii	'STA - get status (firmware version, mounted disks, etc.).',13
 ;		ascii	'SET - set FDC date and time to the TRS-80 date and time.',13
@@ -1257,7 +1215,7 @@ intro:
 ;		ascii	'DIR - get a directory listing of the FDC SD-Card root folder.',13
 		ascii	'INI - select the default ini file.    FDC INI filename.ext',13
 		ascii	'DMK - mount a DMK disk image.         FDC DMK filename.ext n',13
-		ascii	'FOR - format DMK disk image.          FDC FOR n',13
+		ascii	'FOR - format DMK disk image.',13
 ;		ascii	'HFE - mount a HFE disk image.         FDC HFE filename.ext n',13
 ;		ascii   'IMP - import a file from the SD-Card. FDC IMP filename/ext:n',13
 ;		ascii	'EXP - export a file to the SD-card.   FDC EXP filename/ext:n',13
