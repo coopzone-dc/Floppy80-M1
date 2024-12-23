@@ -177,7 +177,7 @@ DAM marker values:
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-static char* g_pszVersion = {"0.1.0"};
+static char* g_pszVersion = {"0.1.1"};
 
 static FdcType       g_FDC;
 static FdcDriveType  g_dtDives[MAX_DRIVES];
@@ -207,6 +207,7 @@ static uint64_t g_nTimeNow;
 static uint64_t g_nPrevTime;
 static uint32_t g_dwRotationTime;
 static uint32_t g_dwIndexTime;
+static uint8_t  g_byTrackWritePerformed;
 
 static byte     byCommandTypes[] = {1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 4, 3, 3};
 
@@ -1374,6 +1375,7 @@ void FdcInit(void)
 	g_dwRotationTime = 200000;	// 200ms
 	g_dwIndexTime    = 2800;	// 2.8ms
 	g_nRotationCount = 0;
+	g_byTrackWritePerformed = 0;
 }
 
 //-----------------------------------------------------------------------------	
@@ -1437,6 +1439,13 @@ void FdcProcessRestoreCommand(void)
 	else
 	{
 		FdcClrFlag(eHeadLoaded);
+	}
+
+	if (g_byTrackWritePerformed)
+	{
+		g_byTrackWritePerformed = 0;
+		FileClose(g_dtDives[nDrive].f);
+		FdcMountDrive(nDrive);
 	}
 
 	FdcReadTrack(nDrive, nSide, 0);
@@ -1928,6 +1937,7 @@ void FdcProcessWriteTrackCommand(void)
 	g_tdTrack.nWriteCount  = g_tdTrack.nWriteSize;
 	g_FDC.nServiceState    = 0;
 	g_FDC.nProcessFunction = psWriteTrack;
+	g_byTrackWritePerformed = 1;
 }
 
 //-----------------------------------------------------------------------------
