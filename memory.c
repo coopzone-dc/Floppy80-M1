@@ -310,6 +310,8 @@ void __not_in_flash_func(service_memory)(void)
         addr.b[1] = get_gpio_data_byte();
         set_gpio(ADDRH_OE_PIN);
 
+        // set_gpio(WAIT_PIN);
+
         if (addr.w >= 0x8000)
         {
             ServiceHighMemoryOperation(addr.w);
