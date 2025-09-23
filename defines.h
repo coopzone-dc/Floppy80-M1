@@ -149,6 +149,34 @@ typedef unsigned long      	dword;
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+// FDC logging
+
+typedef struct {
+	uint8_t type;
+	uint8_t val;
+  uint8_t op1;
+  uint8_t op2;
+} LogType;
+
+#define LOG_SIZE 4096
+
+extern LogType fdc_log[LOG_SIZE];
+extern int log_head;
+extern int log_tail;
+
+enum {
+	write_drive_select = 0,
+	write_data,
+	write_sector,
+	write_track,
+	write_cmd,
+	read_data,
+	read_sector,
+	read_track,
+	read_status,
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // typedefs
 
 typedef struct {

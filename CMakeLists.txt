@@ -44,8 +44,9 @@ add_executable(Floppy80
     system.c
     crc.c
     file.c
-#    cli.c
+    cli.c
     memory.c
+    logging.c
 )
 
 # pull in common dependencies

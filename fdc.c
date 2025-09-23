@@ -15,7 +15,7 @@
 #include "crc.h"
 #include "fdc.h"
 
-// #define ENABLE_LOGGING 1
+#define ENABLE_LOGGING 1
 // #pragma GCC optimize ("Og")
 
 #ifdef MFC
@@ -27,6 +27,10 @@
 
 	#define __not_in_flash_func(x) x
 #endif
+
+LogType fdc_log[LOG_SIZE];
+int log_head = 0;
+int log_tail = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -192,7 +196,7 @@ DAM marker values:
 FdcType      g_FDC;
 FdcDriveType g_dtDives[MAX_DRIVES];
 
-static char* g_pszVersion = {(char*)"0.1.1"};
+static char* g_pszVersion = {(char*)"0.1.2"};
 
 static TrackType   g_tdTrack;
 static SectorType  g_stSector;
@@ -223,8 +227,6 @@ static uint64_t g_nPrevTime;
 static uint32_t g_dwRotationTime;
 static uint32_t g_dwIndexTime;
 static uint8_t  g_byTrackWritePerformed;
-static uint8_t  g_byRwIndex;
-static char     g_szRwBuf[256];
 
 static byte     byCommandTypes[] = {1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 4, 3, 3};
 
@@ -1451,8 +1453,6 @@ void FdcInit(void)
 	g_dwRotationTime = 200000;	// 200ms
 	g_dwIndexTime    = 2800;	// 2.8ms
 	g_nRotationCount = 0;
-	g_byRwIndex      = 0;
-	g_szRwBuf[0]     = 0;
 
 	g_byTrackWritePerformed = 0;
 }
@@ -3202,111 +3202,9 @@ void FdcServiceStateMachine(void)
 	}
 }
 
-#ifdef ENABLE_LOGGING
-//----------------------------------------------------------------------------
-void PurgeRwBuffer(void)
-{
-	if (g_szRwBuf[0] != 0)
-	{
-		#ifdef MFC
-			strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "\r\n");
-			WriteLogFile(g_szRwBuf);
-		#else
-			puts(g_szRwBuf);
-		#endif
-	}
-
-	g_byRwIndex  = 0;
-	g_szRwBuf[0] = 0;
-}
-#endif
-
-#ifdef ENABLE_LOGGING
-//----------------------------------------------------------------------------
-void GetCommandText(char* psz, int nMaxLen, BYTE byCmd)
-{
-	*psz = 0;
-
-	if ((byCmd & 0xF0) == 0)         // 0000xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Restore", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x10) // 0001xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X SEEK %02X, From %02X", byCmd, g_FDC.byData, g_FDC.byTrack);
-	}
-	else if ((byCmd & 0xF0) == 0x20) // 0010xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Step, Do Not Update Track Register", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x30) // 0011xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Step, Update Track Register", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x40) // 0100xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Step In, Do Not Update Track Register", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x50) // 0101xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Step In, Update Track Register", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x60) // 0110xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Step Out, Do Not Update Track Register", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x70) // 0111xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Step Out, Update Track Register", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0x80) // 1000xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X DRV: %02X TRK: %02X RSEC: %02X", byCmd, g_FDC.byDriveSel, g_FDC.byTrack, g_FDC.bySector);
-	}
-	else if ((byCmd & 0xF0) == 0x90) // 1001xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X RSEC: Multiple Record", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0xA0) // 1010xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X WSEC: %02X TRK: %02X", byCmd, g_FDC.bySector, g_FDC.byTrack);
-	}
-	else if ((byCmd & 0xF0) == 0xB0) // 1011xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X WSEC: Multiple Record", byCmd);
-	}
-	else if (byCmd == 0xC4) // 11000100
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Read Address", byCmd);
-	}
-	else if ((byCmd & 0xF0) == 0xD0) // 1101xxxx
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Force Interrupt", byCmd);
-	}
-	else if ((byCmd & 0xFE) == 0xE4) // 1110010x
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X RTRK: %02X", byCmd, g_FDC.byTrack);
-	}
-	else if (byCmd == 0xF4) // 11110100
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X WTRK: %02X", byCmd, g_FDC.byTrack);
-	}
-	else
-	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X Unknown", byCmd);
-	}
-}
-#endif
-
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(fdc_write_cmd)(byte byData)
 {
-#ifdef ENABLE_LOGGING
-    char buf[64];
-
-	PurgeRwBuffer();
-#endif
-
 	g_FDC.byCommandReg = byData;
 
 	if (g_byIntrRequest)
@@ -3326,19 +3224,36 @@ void __not_in_flash_func(fdc_write_cmd)(byte byData)
 		g_FDC.byStatus  &= ~F_INDEX;
 	}
 
-#ifdef MFC
-//	while (g_FDC.byCommandReceived);
-#endif
-
 #ifdef ENABLE_LOGGING
-	GetCommandText(buf, sizeof(buf), byData);
+	fdc_log[log_head].type = write_cmd;
+	fdc_log[log_head].val = byData;
 
-	#ifdef MFC
-		strcat_s(buf, sizeof(buf)-1, "\r\n");
-		WriteLogFile(buf);
-	#else
-		puts(buf);
-	#endif
+	if ((byData & 0xF0) == 0x10) // 0001xxxx
+	{
+		fdc_log[log_head].op1 = g_FDC.byData;
+		fdc_log[log_head].op2 = g_FDC.byTrack;
+	}
+	else if ((byData & 0xF0) == 0x80) // 1000xxxx
+	{
+		fdc_log[log_head].op1 = g_FDC.byTrack;
+		fdc_log[log_head].op2 = g_FDC.bySector;
+	}
+	else if ((byData & 0xF0) == 0xA0) // 1010xxxx
+	{
+		fdc_log[log_head].op1 = g_FDC.byTrack;
+		fdc_log[log_head].op2 = g_FDC.bySector;
+	}
+	else if ((byData & 0xFE) == 0xE4) // 1110010x
+	{
+		fdc_log[log_head].op1 = g_FDC.byTrack;
+	}
+	else if (byData == 0xF4) // 11110100
+	{
+		fdc_log[log_head].op1 = g_FDC.byTrack;
+	}
+
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 }
 
@@ -3348,17 +3263,10 @@ void __not_in_flash_func(fdc_write_track)(byte byData)
 	g_FDC.byTrack = byData;
 
 #ifdef ENABLE_LOGGING
-	PurgeRwBuffer();
-
-	char buf[64];
-    sprintf_s(buf, sizeof(buf)-1, "WR TRACK %02X", byData);
-
-	#ifdef MFC
-		strcat_s(buf, sizeof(buf)-1, "\r\n");
-		WriteLogFile(buf);
-	#else
-		puts(buf);
-	#endif
+	fdc_log[log_head].type = write_track;
+	fdc_log[log_head].val = byData;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 }
 
@@ -3366,10 +3274,6 @@ void __not_in_flash_func(fdc_write_track)(byte byData)
 void __not_in_flash_func(fdc_write_sector)(byte byData)
 {
 	g_FDC.bySector = byData;
-
-#ifdef ENABLE_LOGGING
-	PurgeRwBuffer();
-#endif
 
 	if (byData >= 0xE0)
 	{
@@ -3399,25 +3303,16 @@ void __not_in_flash_func(fdc_write_sector)(byte byData)
 	}
 
 #ifdef ENABLE_LOGGING
-	char buf[64];
-    sprintf_s(buf, sizeof(buf)-1, "WR SECTOR %02X", byData);
-
-	#ifdef MFC
-		strcat_s(buf, sizeof(buf)-1, "\r\n");
-		WriteLogFile(buf);
-	#else
-		puts(buf);
-	#endif
+	fdc_log[log_head].type = write_sector;
+	fdc_log[log_head].val = byData;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 }
 
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(fdc_write_data)(byte byData)
 {
-#ifdef ENABLE_LOGGING
-	char t[8];
-#endif
-
 	g_FDC.byData = byData;
 	g_FDC.status.byDataRequest = 0;
 	g_FDC.byStatus &= ~F_DRQ;
@@ -3447,32 +3342,10 @@ void __not_in_flash_func(fdc_write_data)(byte byData)
 	}
 
 #ifdef ENABLE_LOGGING
-	if (g_byRwIndex == 0)
-	{
-		sprintf_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "WR DATA %02X", byData);
-		++g_byRwIndex;
-	}
-	else if (g_byRwIndex == 15)
-	{
-		sprintf_s(t, sizeof(t)-1, " %02X", byData);
-		strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, t);
-		g_byRwIndex = 0;
-
-		#ifdef MFC
-			strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "\r\n");
-			WriteLogFile(g_szRwBuf);
-		#else
-			puts(g_szRwBuf);
-		#endif
-
-		g_szRwBuf[0] = 0;
-	}
-	else
-	{
-		sprintf_s(t, sizeof(t)-1, " %02X", byData);
-		strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, t);
-		++g_byRwIndex;
-	}
+	fdc_log[log_head].type = write_data;
+	fdc_log[log_head].val = byData;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 }
 
@@ -3500,153 +3373,17 @@ void __not_in_flash_func(fdc_write)(word addr, byte data)
 }
 
 //-----------------------------------------------------------------------------
-void __not_in_flash_func(fdc_get_status_string)(char* buf, int nMaxLen, BYTE byStatus)
-{
-	int nDrive;
-
-	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
-
-	buf[0] = '|';
-	buf[1] = 0;
-
-	if ((nDrive < 0) || (g_dtDives[nDrive].f == NULL))
-	{
-		strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|F_HEADLOAD");
-	}
-	else if ((g_FDC.byCommandType == 1) || // Restore, Seek, Step, Step In, Step Out
-             (g_FDC.byCommandType == 4))   // Force Interrupt
-	{
-		// S0 (BUSY)
-		if (byStatus & F_BUSY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
-		}
-		
-		// S1 (INDEX) default to 0
-		if (byStatus & F_INDEX)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_INDEX|");
-		}
-
-		// S2 (TRACK 0) default to 0
-		if (byStatus & F_TRACK0)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_TRACK0|");
-		}
-
-		// S3 (CRC ERROR) default to 0
-		if (byStatus & F_CRCERR)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
-		}
-
-		// S4 (SEEK ERROR) default to 0
-		if (byStatus & F_SEEKERR)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_SEEKERR|");
-		}
-		
-		if (byStatus & F_HEADLOAD)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_HEADLOAD|");
-		}
-
-		// S6 (PROTECTED) default to 0
-		if (byStatus & F_PROTECTED)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_PROTECTED|");
-		}
-		
-		// S7 (NOT READY) default to 0
-		if (byStatus & F_NOTREADY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
-		}
-	}
-	else if ((g_FDC.byCommandType == 2) ||	// Read Sector, Write Sector
-			 (g_FDC.byCommandType == 3))	// Read Address, Read Track, Write Track
-	{
-		// S0 (BUSY)
-		if (byStatus & F_BUSY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
-		}
-	
-		// S1 (DATA REQUEST)     default to 0
-		if (byStatus & F_DRQ)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
-		}
-
-		// S2 (LOST DATA)        default to 0
-		if (byStatus & F_LOSTDATA)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
-		}
-		
-		// S3 (CRC ERROR)        default to 0
-		if (byStatus & F_CRCERR)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
-		}
-		
-		// S4 (RECORD NOT FOUND) default to 0
-		if (byStatus & F_NOTFOUND)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTFOUND|");
-		}
-	
-		// S5 (RECORD TYPE) default to 0
-		if (byStatus & F_DELETED)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_DELETED|");
-		}
-
-		// S6 (PROTECTED) default to 0
-		if (byStatus & F_PROTECT)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_PROTECT|");
-		}
-
-		// S7 (NOT READY) default to 0
-		if (byStatus & F_NOTREADY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
-		}
-	}
-	else // Force Interrupt
-	{
-	}
-}
-
-//-----------------------------------------------------------------------------
 byte __not_in_flash_func(fdc_read_status)(void)
 {
 #ifdef ENABLE_LOGGING
-	static BYTE byPrevStatus = 0;
+	fdc_log[log_head].type = read_status;
+	fdc_log[log_head].val = g_FDC.byStatus;
+	fdc_log[log_head].op1 = g_FDC.byCommandType;
+	fdc_log[log_head].op2 = g_FDC.byDriveSel;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 
-#ifdef ENABLE_LOGGING
-	if (byPrevStatus != g_FDC.byStatus)
-	{
-		char buf[64];
-		char buf2[128];
-
-		PurgeRwBuffer();
-
-		fdc_get_status_string(buf, sizeof(buf)-1, g_FDC.byStatus);
-		sprintf_s(buf2, sizeof(buf2)-1, "RD STATUS %02X CMD TYPE %d (%s)", g_FDC.byStatus, g_FDC.byCommandType, buf);
-
-		#ifdef MFC
-			strcat_s(buf2, sizeof(buf2)-1, "\r\n");
-			WriteLogFile(buf2);
-		#else
-			puts(buf2);
-		#endif
-
-		byPrevStatus = g_FDC.byStatus;
-	}
-#endif
 	if (g_byIntrRequest)
 	{
 		g_byIntrRequest = 0;
@@ -3660,18 +3397,12 @@ byte __not_in_flash_func(fdc_read_status)(void)
 byte __not_in_flash_func(fdc_read_track)(void)
 {
 #ifdef ENABLE_LOGGING
-	char buf[64];
-
-	PurgeRwBuffer();
-	sprintf_s(buf, sizeof(buf)-1, "RD TRACK %02X", g_FDC.byTrack);
-
-	#ifdef MFC
-		strcat_s(buf, sizeof(buf)-1, "\r\n");
-		WriteLogFile(buf);
-	#else
-		puts(buf);
-	#endif
+	fdc_log[log_head].type = read_track;
+	fdc_log[log_head].val = g_FDC.byTrack;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
+
 	return g_FDC.byTrack;
 }
 
@@ -3679,27 +3410,18 @@ byte __not_in_flash_func(fdc_read_track)(void)
 byte __not_in_flash_func(fdc_read_sector)(void)
 {
 #ifdef ENABLE_LOGGING
-	char buf[64];
-
-	PurgeRwBuffer();
-	sprintf_s(buf, sizeof(buf)-1, "RD SECTOR %02X", g_FDC.bySector);
-
-	#ifdef MFC
-		strcat_s(buf, sizeof(buf)-1, "\r\n");
-		WriteLogFile(buf);
-	#else
-		puts(buf);
-	#endif
+	fdc_log[log_head].type = read_sector;
+	fdc_log[log_head].val = g_FDC.byData;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
+
 	return g_FDC.bySector;
 }
 
 //-----------------------------------------------------------------------------
 byte __not_in_flash_func(fdc_read_data)(void)
 {
-#ifdef ENABLE_LOGGING
-	char t[8];
-#endif
 	if (g_tdTrack.nReadCount > 0)
 	{
 		g_FDC.byData = *g_tdTrack.pbyReadPtr;
@@ -3715,18 +3437,18 @@ byte __not_in_flash_func(fdc_read_data)(void)
 			if (g_FDC.byMultipleRecords)
 			{
 				++g_FDC.bySector;
-#ifdef ENABLE_LOGGING
-				sprintf_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "RD NEXT SECTOR %02X", g_FDC.bySector);
+// #ifdef ENABLE_LOGGING
+// 				sprintf_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "RD NEXT SECTOR %02X", g_FDC.bySector);
 
-				#ifdef MFC
-					strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "\r\n");
-					WriteLogFile(g_szRwBuf);
-				#else
-					puts(g_szRwBuf);
-				#endif
+// 				#ifdef MFC
+// 					strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "\r\n");
+// 					WriteLogFile(g_szRwBuf);
+// 				#else
+// 					puts(g_szRwBuf);
+// 				#endif
 
-				g_szRwBuf[0] = 0;
-#endif
+// 				g_szRwBuf[0] = 0;
+// #endif
 				g_FDC.byCommandReg = 0x98;
 
 				if (g_byIntrRequest)
@@ -3751,32 +3473,10 @@ byte __not_in_flash_func(fdc_read_data)(void)
 	}
 
 #ifdef ENABLE_LOGGING
-	if (g_byRwIndex == 0)
-	{
-		sprintf_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "RD DATA %02X", g_FDC.byData);
-		++g_byRwIndex;
-	}
-	else if (g_byRwIndex == 15)
-	{
-		sprintf_s(t, sizeof(t)-1, " %02X", g_FDC.byData);
-		strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, t);
-
-		#ifdef MFC
-			strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "\r\n");
-			WriteLogFile(g_szRwBuf);
-		#else
-			puts(g_szRwBuf);
-		#endif
-
-		g_byRwIndex  = 0;
-		g_szRwBuf[0] = 0;
-	}
-	else
-	{
-		sprintf_s(t, sizeof(t)-1, " %02X", g_FDC.byData);
-		strcat_s(g_szRwBuf, sizeof(g_szRwBuf)-1, t);
-		++g_byRwIndex;
-	}
+	fdc_log[log_head].type = read_data;
+	fdc_log[log_head].val = g_FDC.byData;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 
 	return g_FDC.byData;
@@ -3815,19 +3515,11 @@ byte __not_in_flash_func(fdc_read)(uint16_t addr)
 void __not_in_flash_func(fdc_write_drive_select)(byte byData)
 {
 #ifdef ENABLE_LOGGING
-	if (g_FDC.byDriveSel != byData)
-	{
-		char buf[64];
-
-	    sprintf_s(buf, sizeof(buf), "WR DRVSEL %02X", byData);
-
-		#ifdef MFC
-			strcat_s(buf, sizeof(buf)-1, "\r\n");
-			WriteLogFile(buf);
-		#else
-			puts(buf);
-		#endif
-	}
+	fdc_log[log_head].type = write_drive_select;
+	fdc_log[log_head].val = byData;
+	fdc_log[log_head].op1 = g_FDC.byDriveSel;
+	++log_head;
+	log_head = log_head % LOG_SIZE;
 #endif
 
 	g_FDC.byDriveSel = byData;

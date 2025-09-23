@@ -185,7 +185,7 @@ int main()
     SDHC_Init();
     FileSystemInit();
     FdcInit();
-    // InitCli();
+    InitCli();
 
     multicore_launch_core1(service_memory);
 
@@ -199,6 +199,6 @@ int main()
     {
         UpdateCounters();
         FdcServiceStateMachine();
-        // ServiceCli();
+        ServiceCli();
     }
 }

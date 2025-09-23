@@ -7,7 +7,8 @@
 #include "system.h"
 #include "file.h"
 #include "fdc.h"
-#include "cli.h"
+
+void ServiceFdcLog(void);
 
 static uint64_t g_nCdcPrevTime;
 static uint32_t g_nCdcConnectDuration;
@@ -20,6 +21,8 @@ static int      g_nCommandLineIndex;
 static DIR     dj;				// Directory object
 static FILINFO fno;				// File information
 
+static bool    g_bOutputLog = false;
+
 static char szHelpText[] = {
                         "\n"
                         "help   - returns this message\n"
@@ -27,6 +30,8 @@ static char szHelpText[] = {
                         "dir    - returns a directory listing of the root folder of the SD-Card\n"
                         "         optionally include a filter.  For example dir .ini\n"
                         "boot   - selects an ini file to be specified in the boot.cfg\n"
+                        "logon  - enable output of FDC interface logging output\n"
+                        "logoff - disable output of FDC interface logging output\n"
                     };
 
 void InitCli(void)
@@ -110,6 +115,18 @@ void ProcessCommand(char* psz)
         return;
     }
 
+    if (stricmp(szCmd, "LOGON") == 0)
+    {
+        g_bOutputLog = true;
+        return;
+    }
+
+    if (stricmp(szCmd, "LOGOFF") == 0)
+    {
+        g_bOutputLog = false;
+        return;
+    }
+    
     puts("Unknown command");
     puts(szHelpText);
 }
@@ -149,6 +166,15 @@ void ServiceCli(void)
 
         printf("\nCMD> ");
         g_bCdcPromptSent = true;
+    }
+
+    if (g_bOutputLog)
+    {
+        ServiceFdcLog();
+    }
+    else
+    {
+        log_tail = log_head;
     }
 
     c = getchar_timeout_us(0);
