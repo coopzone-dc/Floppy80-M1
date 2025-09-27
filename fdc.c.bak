@@ -3237,15 +3237,9 @@ void __not_in_flash_func(fdc_write_cmd)(byte byData)
 	{
 		fdc_log[log_head].op1 = g_FDC.byTrack;
 	}
-	else if (byData == 0xF0) // 11110000
-	{
-		fdc_log[log_head].op1 = g_FDC.byDriveSel;
-		fdc_log[log_head].op2 = g_FDC.byTrack;
-	}
 	else if (byData == 0xF4) // 11110100
 	{
-		fdc_log[log_head].op1 = g_FDC.byDriveSel;
-		fdc_log[log_head].op2 = g_FDC.byTrack;
+		fdc_log[log_head].op1 = g_FDC.byTrack;
 	}
 
 	++log_head;
