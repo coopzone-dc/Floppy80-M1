@@ -196,7 +196,7 @@ DAM marker values:
 FdcType      g_FDC;
 FdcDriveType g_dtDives[MAX_DRIVES];
 
-static char* g_pszVersion = {(char*)"0.1.2"};
+static char* g_pszVersion = {(char*)"0.1.3"};
 
 static TrackType   g_tdTrack;
 static SectorType  g_stSector;
