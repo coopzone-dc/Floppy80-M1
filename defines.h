@@ -158,7 +158,7 @@ typedef struct {
   uint8_t op2;
 } LogType;
 
-#define LOG_SIZE 4096
+#define LOG_SIZE 1024
 
 extern LogType fdc_log[LOG_SIZE];
 extern int log_head;

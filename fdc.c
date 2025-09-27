@@ -15,7 +15,7 @@
 #include "crc.h"
 #include "fdc.h"
 
-#define ENABLE_LOGGING 1
+// #define ENABLE_LOGGING 1
 // #pragma GCC optimize ("Og")
 
 #ifdef MFC
@@ -2460,7 +2460,55 @@ void FdcProcessTrackData1791(TrackType* ptdTrack)
 }
 
 //-----------------------------------------------------------------------------
-void FdcBuildIdamTable(TrackType* ptdTrack)
+void FdcBuildIdamTable1771(TrackType* ptdTrack)
+{
+	BYTE* pbyTrackData = ptdTrack->byTrackData;
+	BYTE  byDensity    = g_dtDives[ptdTrack->nDrive].dmk.byDensity;
+	BYTE  byFound;
+	int   nIndex, nIDAM;
+	int   nTrackSize = ptdTrack->nTrackSize;
+
+	// reset IDAM table to 0's
+	memset(pbyTrackData, 0, 0x80);
+	memset(ptdTrack->nIDAM, 0, sizeof(ptdTrack->nIDAM));
+
+	// search track data for sectors (start at first byte after the last IDAM index)
+	nIndex = 128;
+	nIDAM  = 0;
+
+	while (nIndex < nTrackSize)
+	{
+		byFound = 0;
+
+		while ((byFound == 0) && (nIndex < nTrackSize))
+		{
+			if (*(pbyTrackData+nIndex) == 0xFE)
+			{
+				byDensity = eSD;
+				byFound = 1;
+			}
+			else
+			{
+				++nIndex;
+			}
+		}
+
+		if (byFound)
+		{
+			// at this point nIndex contains the location of the first 0xA1 byte for DD; or at 0xFE for SD;
+			ptdTrack->nIDAM[nIDAM] = nIndex;
+
+			*(pbyTrackData + nIDAM * 2)     = nIndex & 0xFF;
+			*(pbyTrackData + nIDAM * 2 + 1) = nIndex >> 8;
+
+			++nIDAM;
+			nIndex += 7; // skip past address mark data
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+void FdcBuildIdamTable1791(TrackType* ptdTrack)
 {
 	BYTE* pbyTrackData = ptdTrack->byTrackData;
 	BYTE  byDensity    = g_dtDives[ptdTrack->nDrive].dmk.byDensity;
@@ -2514,7 +2562,7 @@ void FdcBuildIdamTable(TrackType* ptdTrack)
 			*(pbyTrackData + nIDAM * 2 + 1) = nIndex >> 8;
 
 			++nIDAM;
-			nIndex += 2;
+			nIndex += 7; // skip past address mark data
 		}
 	}
 }
@@ -2649,13 +2697,14 @@ void FdcServiceWriteTrack(void)
 			if (g_FDC.byDoublerDensity)
 			{
 				FdcProcessTrackData1791(&g_tdTrack);	// scan track data to generate CRC values
+				FdcBuildIdamTable1791(&g_tdTrack);		// scan track data to build the IDAM table
 			}
 			else
 			{
 				FdcProcessTrackData1771(&g_tdTrack);	// scan track data to generate CRC values
+				FdcBuildIdamTable1771(&g_tdTrack);		// scan track data to build the IDAM table
 			}
 
-			FdcBuildIdamTable(&g_tdTrack);		// scan track data to build the IDAM table
 			FdcBuildDataSizeTable(&g_tdTrack);
 			FdcBuildDamTable(&g_tdTrack);
 
@@ -3346,8 +3395,6 @@ void __not_in_flash_func(fdc_write_sector)(byte byData)
 void __not_in_flash_func(fdc_write_data)(byte byData)
 {
 	g_FDC.byData = byData;
-	g_FDC.status.byDataRequest = 0;
-	g_FDC.byStatus &= ~F_DRQ;
 
 	if (g_tdTrack.nWriteCount > 0)
 	{
@@ -3370,7 +3417,15 @@ void __not_in_flash_func(fdc_write_data)(byte byData)
 			// FdcClrFlag(eBusy);
 			g_FDC.status.byBusy = 0;
 			g_FDC.byStatus &= ~F_BUSY;
+
+			g_FDC.status.byDataRequest = 0;
+			g_FDC.byStatus &= ~F_DRQ;
 		}
+	}
+	else
+	{
+		g_FDC.status.byDataRequest = 0;
+		g_FDC.byStatus &= ~F_DRQ;
 	}
 
 #ifdef ENABLE_LOGGING
@@ -3458,14 +3513,14 @@ byte __not_in_flash_func(fdc_read_data)(void)
 	{
 		g_FDC.byData = *g_tdTrack.pbyReadPtr;
 		
-		g_FDC.status.byDataRequest = 0;
-		g_FDC.byStatus &= ~F_DRQ;
-
 		g_tdTrack.pbyReadPtr += g_FDC.nDataSize;
 		--g_tdTrack.nReadCount;
 
 		if (g_tdTrack.nReadCount == 0)
 		{
+			g_FDC.status.byDataRequest = 0;
+			g_FDC.byStatus &= ~F_DRQ;
+
 			if (g_FDC.byMultipleRecords)
 			{
 				++g_FDC.bySector;

@@ -98,7 +98,7 @@ void GetCommandText(char* psz, int nMaxLen, BYTE byCmd, BYTE op1, BYTE op2)
 	}
 	else if (byCmd == 0xF4) // 11110100
 	{
-		sprintf_s(psz, nMaxLen, "CMD: %02X WTRK: %02X", byCmd, op1);
+		sprintf_s(psz, nMaxLen, "CMD: %02X DSEL: %02X WTRK: %02X", byCmd, op1, op2);
 	}
 	else
 	{
