@@ -365,6 +365,7 @@ extern volatile BYTE  g_byIntrRequest;
 
 void FdcSaveBootCfg(char* pszIniFile);
 void FdcProcessStatusRequest(byte print);
+int  FdcGetDriveIndex(int nDriveSel);
 
 void LoadHfeTrack(file* pFile, int nTrack, int nSide, HfeDriveType* pdisk, TrackType* ptrack, BYTE* pbyTrackData, int nMaxLen);
 
