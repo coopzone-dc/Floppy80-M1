@@ -15,6 +15,7 @@
 #include "crc.h"
 #include "fdc.h"
 
+// #define ENABLE_DOUBLER 1
 // #define ENABLE_LOGGING 1
 // #pragma GCC optimize ("Og")
 
@@ -31,6 +32,13 @@
 LogType fdc_log[LOG_SIZE];
 int log_head = 0;
 int log_tail = 0;
+
+////////////////////////////////////////////////////////////////////////////////////
+// watch variable
+int drive;
+int side;
+int track;
+int sector;
 
 ////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -636,7 +644,7 @@ WORD FdcGetIDAM(int nSector)
 // returns the index of the 0xFE byte in the sector byte sequence 0xA1, 0xA1, 0xA1, 0xFE
 // in the g_tdTrack.byTrackData[] address for the specified sector.
 //
-int FdcGetSectorIDAM_Offset(int nSide, int nTrack, int nSector)
+int FdcGetSectorDataOffset(int nSide, int nTrack, int nSector)
 {
 	BYTE* pby;
 	WORD  wIDAM;
@@ -661,13 +669,6 @@ int FdcGetSectorIDAM_Offset(int nSide, int nTrack, int nSector)
 		if ((*pby == 0xFE) && (*(pby+1) == 0xFE)) // then double byte data
 		{
 			if ((*(pby+2) == nTrack) && (*(pby+4) == nSide) && (*(pby+6) == nSector))
-			{
-				return nOffset;
-			}
-		}
-		else if (wIDAM & 0x8000)
-		{
-			if ((*(pby+1) == nTrack) && (*(pby+2) == nSide) && (*(pby+3) == nSector))
 			{
 				return nOffset;
 			}
@@ -722,12 +723,11 @@ BYTE FdcIsDataStartPatern(BYTE* pby)
 }
 
 //-----------------------------------------------------------------------------
-int FdcGetDataSize(TrackType* ptdTrack, int nIDAM)
+int FdcGetDataSize(TrackType* ptdTrack, int nDataOffset)
 {
 	BYTE* pby;
-	int   nDataOffset = FdcGetIDAM_Offset(nIDAM);
 	
-	if (nIDAM < 0)
+	if (nDataOffset < 0)
 	{
 		return 1;
 	}
@@ -743,15 +743,16 @@ int FdcGetDataSize(TrackType* ptdTrack, int nIDAM)
 }
 
 //-----------------------------------------------------------------------------
-int FdcGetDAM_Offset(TrackType* ptdTrack, int nIDAM, int nDataSize)
+int FdcGetDAM_Offset(TrackType* ptdTrack, int nDataOffset, int nDataSize)
 {
 	BYTE* pby;
-	int   nDataOffset = FdcGetIDAM_Offset(nIDAM) + 7 * nDataSize;
 	
-	if (nIDAM < 0)
+	if (nDataOffset < 0)
 	{
 		return -1;
 	}
+
+	nDataOffset = nDataOffset + 7 * nDataSize;
 
 	if ((nDataSize == 1) && (ptdTrack->byDensity == eDD)) // double density
 	{
@@ -795,9 +796,9 @@ void FdcFillSectorOffset(TrackType* ptdTrack)
 	
 	for (i = 0; i < 0x80; ++i)
 	{
-		ptdTrack->nIDAM[i]     = FdcGetSectorIDAM_Offset(ptdTrack->nSide, ptdTrack->nTrack, i);
-		ptdTrack->nDataSize[i] = FdcGetDataSize(ptdTrack, ptdTrack->nIDAM[i]);
-		ptdTrack->nDAM[i]      = FdcGetDAM_Offset(ptdTrack, ptdTrack->nIDAM[i], ptdTrack->nDataSize[i]);
+		ptdTrack->nDataOffset[i] = FdcGetSectorDataOffset(ptdTrack->nSide, ptdTrack->nTrack, i);
+		ptdTrack->nDataSize[i]   = FdcGetDataSize(ptdTrack, ptdTrack->nDataOffset[i]);
+		ptdTrack->nDAM[i]        = FdcGetDAM_Offset(ptdTrack, ptdTrack->nDataOffset[i], ptdTrack->nDataSize[i]);
 	}
 }
 
@@ -807,6 +808,13 @@ void FdcReadDmkTrack(int nDrive, int nSide, int nTrack)
 	int nTrackOffset;
 	
 	g_tdTrack.nType = eDMK;
+
+	if ((nDrive == 2) && (nTrack == 0))
+	{
+		drive = nDrive;
+		side = nSide;
+		track = nTrack;
+	}
 
 	// check if specified track is already in memory
 	if ((g_tdTrack.nDrive == nDrive) && (g_tdTrack.nSide == nSide) && (g_tdTrack.nTrack == nTrack))
@@ -830,6 +838,24 @@ void FdcReadDmkTrack(int nDrive, int nSide, int nTrack)
 	g_tdTrack.nTrack     = nTrack;
 	g_tdTrack.nTrackSize = g_dtDives[nDrive].dmk.wTrackLength;
 
+	if (nDrive == 2)
+	{
+		nDrive = 2;
+	}
+
+	WORD  wIDAM   = FdcGetIDAM(0);
+	int   nOffset = wIDAM & 0x3FFF;
+	BYTE* pby = g_tdTrack.byTrackData + nOffset;
+
+	if (*(pby-1) == 0xA1)
+	{
+		g_tdTrack.byDensity = eDD;
+	}
+	else
+	{
+		g_tdTrack.byDensity = eSD;
+	}
+
 	FdcFillSectorOffset(&g_tdTrack);
 
 	// For Double denisty
@@ -849,18 +875,6 @@ void FdcReadDmkTrack(int nDrive, int nSide, int nTrack)
 	// 	bySectorData[SectorOffset+3] sector number    (should be the same as the nSector parameter)
 	// 	bySectorData[SectorOffset+4] byte length (log 2, minus seven), 0 => 128 bytes; 1 => 256 bytes; etc.
 
-	WORD  wIDAM   = FdcGetIDAM(0);
-	int   nOffset = wIDAM & 0x3FFF;
-	BYTE* pby = g_tdTrack.byTrackData + nOffset;
-
-	if (*(pby-1) == 0xA1)
-	{
-		g_tdTrack.byDensity = eDD;
-	}
-	else
-	{
-		g_tdTrack.byDensity = eSD;
-	}
 }
 /*
 //-----------------------------------------------------------------------------
@@ -909,7 +923,7 @@ int FindSectorIndex(int nSector, TrackType* ptrack)
 	// locate sector
 	for (i = 0; i < MAX_SECTORS_PER_TRACK; ++i)
 	{
-		nOffset = FdcGetIDAM_Offset(ptrack->nIDAM[i])+6;
+		nOffset = ptrack->nDataOffset[i]+6;
 
 		if ((nOffset < sizeof(ptrack->byTrackData)) && (ptrack->byTrackData[nOffset] == nSector))
 		{
@@ -953,7 +967,7 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	g_tdTrack.nFileOffset = FdcGetTrackOffset(nDrive, nSide, nTrack);
 
-	int nOffset = FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector]);
+	int nOffset = g_tdTrack.nDataOffset[nSector];
 
 	// get pointer to start of sector data
 	pby = g_tdTrack.byTrackData + nOffset;
@@ -988,7 +1002,7 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 	// g_FDC.byTrackData[g_FDC.nSectorOffset+5..6] CRC (calculation starts with the three 0xA1/0xF5 bytes preceeding the 0xFE)
 	FdcClrFlag(eCrcError);
 
-	if (FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector]) <= 0)
+	if (g_tdTrack.nDataOffset[nSector] <= 0)
 	{
 		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcSetFlag(eNotFound);
@@ -1012,8 +1026,8 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 	}
 
 	WORD wCRC16  = 0;
-	int  nIndex1 = FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector])+5*nDataSize;
-	int  nIndex2 = FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector])+6*nDataSize;
+	int  nIndex1 = g_tdTrack.nDataOffset[nSector]+5*nDataSize;
+	int  nIndex2 = g_tdTrack.nDataOffset[nSector]+6*nDataSize;
 
 	if ((nIndex1 < sizeof(g_tdTrack.byTrackData)) && (nIndex2 < sizeof(g_tdTrack.byTrackData)))
 	{
@@ -1094,7 +1108,7 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 	g_tdTrack.nFileOffset = FdcGetTrackOffset(nDrive, nSide, nTrack);
 
 	// get pointer to start of sector data
-	int nOffset = FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector]);
+	int nOffset = g_tdTrack.nDataOffset[nSector];
 
 	pby = g_tdTrack.byTrackData + nOffset;
 
@@ -1113,7 +1127,7 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 	// g_FDC.byTrackData[g_FDC.nSectorOffset+5..6] CRC (calculation starts with the three 0xA1/0xF5 bytes preceeding the 0xFE)
 	FdcClrFlag(eCrcError);
 
-	if (FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector]) <= 0)
+	if (g_tdTrack.nDataOffset[nSector] <= 0)
 	{
 		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcSetFlag(eNotFound);
@@ -1123,8 +1137,8 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 	wCalcCRC16 = Calculate_CRC_CCITT(pby-3, 8, 1);
 	
 	WORD wCRC16  = 0;
-	int  nIndex1 = FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector])+5;
-	int  nIndex2 = FdcGetIDAM_Offset(g_tdTrack.nIDAM[nSector])+6;
+	int  nIndex1 = g_tdTrack.nDataOffset[nSector]+5;
+	int  nIndex2 = g_tdTrack.nDataOffset[nSector]+6;
 
 	if ((nIndex1 < sizeof(g_tdTrack.byTrackData)) && (nIndex2 < sizeof(g_tdTrack.byTrackData)))
 	{
@@ -1196,7 +1210,7 @@ void FdcReadHfeSector(int nDriveSel, int nSide, int nTrack, int nSector)
 	g_FDC.byRecordMark           = g_tdTrack.byTrackData[g_tdTrack.nDAM[i] + 3];
 	g_stSector.nSectorDataOffset = g_tdTrack.nDAM[FindSectorIndex(nSector, &g_tdTrack)] + 4;
 	
-	int nOffset = FdcGetIDAM_Offset(g_tdTrack.nIDAM[i]) + 7;
+	int nOffset = g_tdTrack.nDataOffset[i] + 7;
 
 	if (nOffset < sizeof(g_tdTrack.byTrackData))
 	{
@@ -2470,7 +2484,7 @@ void FdcBuildIdamTable1771(TrackType* ptdTrack)
 
 	// reset IDAM table to 0's
 	memset(pbyTrackData, 0, 0x80);
-	memset(ptdTrack->nIDAM, 0, sizeof(ptdTrack->nIDAM));
+	memset(ptdTrack->nDataOffset, 0, sizeof(ptdTrack->nDataOffset));
 
 	// search track data for sectors (start at first byte after the last IDAM index)
 	nIndex = 128;
@@ -2496,7 +2510,7 @@ void FdcBuildIdamTable1771(TrackType* ptdTrack)
 		if (byFound)
 		{
 			// at this point nIndex contains the location of the first 0xA1 byte for DD; or at 0xFE for SD;
-			ptdTrack->nIDAM[nIDAM] = nIndex;
+			ptdTrack->nDataOffset[nIDAM] = nIndex;
 
 			*(pbyTrackData + nIDAM * 2)     = nIndex & 0xFF;
 			*(pbyTrackData + nIDAM * 2 + 1) = nIndex >> 8;
@@ -2518,7 +2532,7 @@ void FdcBuildIdamTable1791(TrackType* ptdTrack)
 
 	// reset IDAM table to 0's
 	memset(pbyTrackData, 0, 0x80);
-	memset(ptdTrack->nIDAM, 0, sizeof(ptdTrack->nIDAM));
+	memset(ptdTrack->nDataOffset, 0, sizeof(ptdTrack->nDataOffset));
 
 	// search track data for sectors (start at first byte after the last IDAM index)
 	nIndex = 128;
@@ -2556,7 +2570,7 @@ void FdcBuildIdamTable1791(TrackType* ptdTrack)
 				nIndex += 3; // The IDAM pointer is the offset from the start of track data to the 0xFE of the associated sector.
 			}
 
-			ptdTrack->nIDAM[nIDAM] = nIndex;
+			ptdTrack->nDataOffset[nIDAM] = nIndex;
 
 			*(pbyTrackData + nIDAM * 2)     = nIndex & 0xFF;
 			*(pbyTrackData + nIDAM * 2 + 1) = nIndex >> 8;
@@ -2574,7 +2588,7 @@ void FdcBuildDataSizeTable(TrackType* ptdTrack)
 	
 	for (i = 0; i < 0x80; ++i)
 	{
-		ptdTrack->nDataSize[i] = FdcGetDataSize(ptdTrack, ptdTrack->nIDAM[i]);
+		ptdTrack->nDataSize[i] = FdcGetDataSize(ptdTrack, ptdTrack->nDataOffset[i]);
 	}
 }
 
@@ -2585,7 +2599,7 @@ void FdcBuildDamTable(TrackType* ptdTrack)
 	
 	for (i = 0; i < 0x80; ++i)
 	{
-		ptdTrack->nDAM[i] = FdcGetDAM_Offset(ptdTrack, ptdTrack->nIDAM[i], ptdTrack->nDataSize[i]);
+		ptdTrack->nDAM[i] = FdcGetDAM_Offset(ptdTrack, ptdTrack->nDataOffset[i], ptdTrack->nDataSize[i]);
 	}
 }
 
@@ -2619,16 +2633,6 @@ void FdcWriteDmkTrack(TrackType* ptdTrack)
 		FileSeek(g_dtDives[ptdTrack->nDrive].f, 0);
 		FileWrite(g_dtDives[ptdTrack->nDrive].f, g_dtDives[ptdTrack->nDrive].dmk.byDmkDiskHeader, sizeof(g_dtDives[ptdTrack->nDrive].dmk.byDmkDiskHeader));
 	}
-
-	// TODO: check if the disk header (number of sides) needs to be updated
-	// if ((g_dtDives[ptdTrack->nDrive].dmk.byDmkDiskHeader[4] & 0x10) != 0)
-	// {
-	// 	g_dtDives[ptdTrack->nDrive].dmk.byNumSides = 1;
-	// }
-	// else
-	// {
-	// 	g_dtDives[ptdTrack->nDrive].dmk.byNumSides = 2;
-	// }
 
 	// check if the disk header (density) needs to be updated
 	if (ptdTrack->byDensity != g_dtDives[ptdTrack->nDrive].dmk.byDensity)

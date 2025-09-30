@@ -81,9 +81,6 @@ extern "C" {
 #define MAX_SECTORS_PER_TRACK 32
 #define MAX_TRACK_LEN 0x4000
 
-#define FdcGetIDAM_Offset(x) (0x3FFF & x)
-//#define FdcGetIDAM_Density(x) (0x8000 & x)
-
 #define CPM_BLOCK_SIZE 0x200
 #define CPM_READ_BLOCK_CMD  0x10
 #define CPM_WRITE_BLOCK_CMD 0x11
@@ -239,11 +236,8 @@ typedef struct {
 	int nFileOffset;              // byte offset from the start of the file to the start of this track
 
 	int  nDataSize[0x80];         // byte per data entry (1 = single; or 2=double byte data)
-	int  nIDAM[0x80];             // byte offset from start of track buffer for each ID Address Mark
+	int  nDataOffset[0x80];       // byte offset from start of track buffer for each ID Address Mark
 	int  nDAM[0x80];              // byte offset from start of track buffer for each Data Address Mark
-
-	int nSectorIDAM_BitPos[0x80];	// bit offset from start of track buffer for each ID Address Mark
-	int nSectorDAM_BitPos[0x80];	// bit offset from start of track buffer for each Data Address Mark
 
 	BYTE* pbyReadPtr;
 	BYTE* pbyWritePtr;
@@ -369,6 +363,7 @@ int  FdcGetDriveIndex(int nDriveSel);
 
 void LoadHfeTrack(file* pFile, int nTrack, int nSide, HfeDriveType* pdisk, TrackType* ptrack, BYTE* pbyTrackData, int nMaxLen);
 
+int  FdcGetDriveIndex(int nDriveSel);
 void FdcSetFlag(byte flag);
 void FdcClrFlag(byte flag);
 void FdcGenerateIntr(void);
