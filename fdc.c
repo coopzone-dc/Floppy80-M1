@@ -2018,7 +2018,7 @@ void FdcProcessWriteTrackCommand(void)
 	if (g_FDC.byDoublerDensity)
 	{
 		g_tdTrack.byDensity = eDD;
-		nWriteSize = 6214;
+		nWriteSize = 6364;
 	}
 	else
 	{
@@ -2026,7 +2026,13 @@ void FdcProcessWriteTrackCommand(void)
 		nWriteSize = 3105;
 	}
 
-	g_tdTrack.nDrive       = FdcGetDriveIndex(g_FDC.byDriveSel);
+	g_tdTrack.nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
+
+	if ((g_tdTrack.nDrive < 0) || (g_tdTrack.nDrive >= MAX_DRIVES))
+	{
+		return;
+	}
+
 	g_tdTrack.nSide        = nSide;
 	g_tdTrack.nTrack       = g_FDC.byTrack;
 	g_tdTrack.pbyWritePtr  = g_tdTrack.byTrackData + 0x80;
