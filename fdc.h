@@ -328,6 +328,9 @@ typedef struct {
 	BYTE  byDoublerSide;
 	BYTE  byDoublerDensity;
 	BYTE  byDoublerPrecomp;
+
+	BYTE  byCrcError;
+	BYTE  byReadData;
 } FdcType;
 
 #define FDC_REQUEST_SIZE 0x200

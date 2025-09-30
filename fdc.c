@@ -3284,23 +3284,34 @@ void FdcServiceStateMachine(void)
 //-----------------------------------------------------------------------------
 void __not_in_flash_func(fdc_write_cmd)(byte byData)
 {
-	g_FDC.byCommandReg = byData;
-
-	if (g_byIntrRequest)
+	if (byData == 0xFE) // Percom doubler
 	{
-		g_byIntrRequest = 0;
-		g_byFdcIntrActive = false;
+		g_FDC.byDoublerDensity = 0;
 	}
-
-	g_FDC.status.byBusy = 1;
-	g_FDC.byStatus     |= F_BUSY;
-	g_FDC.byCommandReceived = 1;
-
-	if (byData == 0xF4)
+	else if (byData == 0xFF) // Percom doubler
 	{
-		g_nRotationCount = g_dwIndexTime + 1;
-		g_FDC.status.byIndex = 0;
-		g_FDC.byStatus  &= ~F_INDEX;
+		g_FDC.byDoublerDensity = 1;
+	}
+	else
+	{
+		g_FDC.byCommandReg = byData;
+
+		if (g_byIntrRequest)
+		{
+			g_byIntrRequest = 0;
+			g_byFdcIntrActive = false;
+		}
+
+		g_FDC.status.byBusy = 1;
+		g_FDC.byStatus     |= F_BUSY;
+		g_FDC.byCommandReceived = 1;
+
+		if (byData == 0xF4)
+		{
+			g_nRotationCount = g_dwIndexTime + 1;
+			g_FDC.status.byIndex = 0;
+			g_FDC.byStatus  &= ~F_INDEX;
+		}
 	}
 
 #ifdef ENABLE_LOGGING
