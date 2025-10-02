@@ -15,9 +15,9 @@
 #include "crc.h"
 #include "fdc.h"
 
-// #define ENABLE_DOUBLER 1
-// #define ENABLE_LOGGING 1
-// #pragma GCC optimize ("Og")
+#define ENABLE_DOUBLER 1
+#define ENABLE_LOGGING 1
+#pragma GCC optimize ("Og")
 
 #ifdef MFC
 	#include "z80emu.h"
@@ -206,8 +206,8 @@ FdcDriveType g_dtDives[MAX_DRIVES];
 
 static char* g_pszVersion = {(char*)"0.1.3"};
 
-static TrackType   g_tdTrack;
-static SectorType  g_stSector;
+TrackType   g_tdTrack;
+SectorType  g_stSector;
 
 static char        g_szBootConfig[80];
 
@@ -1234,7 +1234,7 @@ void FdcReadSector(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 
-	if ((nDrive == 2) && (nTrack == 1))
+	if ((nDrive == 2) && (nTrack == 0x11))
 	{
 		drive = nDrive;
 		side = nSide;
@@ -2016,6 +2016,47 @@ void FdcProcessReadTrackCommand(void)
 }
 
 //-----------------------------------------------------------------------------
+void InitDmkDiskHeader(void)
+{
+	int nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES))
+	{
+		return;
+	}
+
+	memset(g_dtDives[nDrive].dmk.byDmkDiskHeader, 0, sizeof(g_dtDives[nDrive].dmk.byDmkDiskHeader));
+
+	if (g_FDC.byDoublerDensity)
+	{
+		g_tdTrack.byDensity = eDD;
+		g_dtDives[nDrive].dmk.wTrackLength = 6500;
+	}
+	else
+	{
+		g_tdTrack.byDensity = eSD;
+		g_dtDives[nDrive].dmk.byDmkDiskHeader[4] |= 0x40; // single density
+		g_dtDives[nDrive].dmk.wTrackLength = 3200;
+	}
+
+	g_dtDives[nDrive].dmk.byWriteProtected = 0;
+	g_dtDives[nDrive].dmk.byNumSides = 2;
+	g_dtDives[nDrive].byNumTracks = 40;
+
+	g_dtDives[nDrive].dmk.byDensity = g_tdTrack.byDensity;
+	g_dtDives[nDrive].dmk.byDmkDiskHeader[1] = g_dtDives[nDrive].byNumTracks;
+	g_dtDives[nDrive].dmk.byDmkDiskHeader[2] = g_dtDives[nDrive].dmk.wTrackLength & 0xFF;
+	g_dtDives[nDrive].dmk.byDmkDiskHeader[3] = (g_dtDives[nDrive].dmk.wTrackLength >> 8) & 0xFF;
+
+	FileClose(g_dtDives[nDrive].f);
+	g_dtDives[nDrive].f = FileOpen(g_dtDives[nDrive].szFileName, FA_READ | FA_WRITE);
+	FileSeek(g_dtDives[nDrive].f, 0);
+	FileWrite(g_dtDives[nDrive].f, g_dtDives[nDrive].dmk.byDmkDiskHeader, sizeof(g_dtDives[nDrive].dmk.byDmkDiskHeader));
+	FileClose(g_dtDives[nDrive].f);
+	g_dtDives[nDrive].f = FileOpen(g_dtDives[nDrive].szFileName, FA_READ | FA_WRITE);
+}
+
+//-----------------------------------------------------------------------------
 // Command code 1 1 1 1 0 1 0 0
 //
 void FdcProcessWriteTrackCommand(void)
@@ -2031,7 +2072,7 @@ void FdcProcessWriteTrackCommand(void)
 	if (g_FDC.byDoublerDensity)
 	{
 		g_tdTrack.byDensity = eDD;
-		nWriteSize = 6364;
+		nWriteSize = 6214; // Tandy doubler track size
 	}
 	else
 	{
@@ -2044,6 +2085,11 @@ void FdcProcessWriteTrackCommand(void)
 	if ((g_tdTrack.nDrive < 0) || (g_tdTrack.nDrive >= MAX_DRIVES))
 	{
 		return;
+	}
+
+	if (g_FDC.byTrack == 0)
+	{
+		InitDmkDiskHeader();
 	}
 
 	g_tdTrack.nSide        = nSide;
@@ -2466,7 +2512,7 @@ void FdcProcessTrackData1771(TrackType* ptdTrack)
 			case 0xFE:
 				// single density only
 				pbyCrcStart = pbySrc;
-				ptdTrack->nSide = *(pbySrc+2);
+				// ptdTrack->nSide = *(pbySrc+2);
 				break;
 		}
 		
@@ -3343,7 +3389,7 @@ void __not_in_flash_func(fdc_write_cmd)(byte byData)
 		}
 
 		g_FDC.status.byBusy = 1;
-		g_FDC.byStatus     |= F_BUSY;
+		g_FDC.byStatus      = F_BUSY;
 		g_FDC.byCommandReceived = 1;
 
 		if (byData == 0xF4)

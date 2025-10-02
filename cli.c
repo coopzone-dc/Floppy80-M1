@@ -10,6 +10,9 @@
 
 void ServiceFdcLog(void);
 
+extern FdcDriveType g_dtDives[MAX_DRIVES];
+extern TrackType    g_tdTrack;
+
 static uint64_t g_nCdcPrevTime;
 static uint32_t g_nCdcConnectDuration;
 static bool     g_bCdcConnected;
@@ -32,6 +35,8 @@ static char szHelpText[] = {
                         "boot   - selects an ini file to be specified in the boot.cfg\n"
                         "logon  - enable output of FDC interface logging output\n"
                         "logoff - disable output of FDC interface logging output\n"
+                        "disks  - returns the stats to the mounted diskettes\n"
+                        "dump   - returns sectors of each track on the indicate drive\n"
                     };
 
 void InitCli(void)
@@ -81,6 +86,139 @@ void ListFiles(char* pszFilter)
 	}
 }
 
+void ProcessDisksRequest(void)
+{
+    int i;
+    char* pszDensity[] = {"SD", "DD"};
+
+    for (i = 0; i < MAX_DRIVES; ++i)
+    {
+        printf("File name  : %s\r\n", g_dtDives[i].szFileName);
+        printf("Density    : %s\r\n", pszDensity[g_dtDives[i].dmk.byDensity]);
+        printf("Num sides  : %d\r\n", g_dtDives[i].dmk.byNumSides);
+        printf("Track size : %d\r\n", g_dtDives[i].dmk.wTrackLength);
+        printf("Sector size: %d\r\n", g_dtDives[i].dmk.nSectorSize);
+    }
+}
+
+void DumpSector(int nDrive, int nTrack, int nSector)
+{
+    int nOffset = g_tdTrack.nDataOffset[nSector];
+    int nSectorSize = 256; //g_dtDives[nDrive].dmk.byDmkDiskHeader[1];
+    int i;
+
+    if (nOffset < 0)
+    {
+        return;
+    }
+
+    printf("Drive %d, Track %d, Sector %d\r\n", nDrive, nTrack, nSector);
+    sleep_ms(1);
+
+    BYTE* pby = g_tdTrack.byTrackData + nOffset - 3;
+
+    // dump to the 0xFE byte
+    for (i = 1; i <= 256; ++i)
+    {
+        printf("%02X ", *pby);
+
+        if ((i % 16) == 0)
+        {
+            printf("\r\n");
+            sleep_ms(5);
+        }
+
+        if (*pby == 0xFE)
+        {
+            i = 256;
+        }
+        else
+        {
+            ++pby;
+        }
+    }
+
+    printf("\r\n");
+
+    if (*pby != 0xFE)
+    {
+        return;
+    }
+
+    ++pby;
+    printf("Track %d, Side %d, Sector %d, Length %d\r\n",
+            *pby, *(pby+1), *(pby+2), *(pby+3));
+    sleep_ms(5);
+
+    nSectorSize = 128 << *(pby+3);
+    
+    pby += 4;
+
+    // dump to the 0xFB byte
+    for (i = 1; i <= 256; ++i)
+    {
+        printf("%02X ", *pby);
+
+        if ((i % 16) == 0)
+        {
+            printf("\r\n");
+            sleep_ms(5);
+        }
+
+        if (*pby == 0xFB)
+        {
+            i = 256;
+        }
+        else
+        {
+            ++pby;
+        }
+    }
+
+    printf("\r\n");
+
+    if (*pby != 0xFB)
+    {
+        return;
+    }
+
+    ++pby;
+
+    for (i = 1; i <= nSectorSize; ++i)
+    {
+        printf("%02X ", *pby);
+        ++pby;
+
+        if ((i % 16) == 0)
+        {
+            printf("\r\n");
+            sleep_ms(5);
+        }
+    }
+
+    printf("\r\n");
+    sleep_ms(5);
+}
+
+void ProcessDumpRequest(void)
+{
+    int nDrive  = 2;
+    int nTracks = g_dtDives[nDrive].dmk.byDmkDiskHeader[1];
+    int i, j;
+
+    for (i = 0; i < nTracks; ++i)
+    {
+    	FdcReadTrack(nDrive, 0, i);
+
+        printf("Track %d\r\n", i);
+
+        for (j = 0; j < 64; ++j)
+        {
+            DumpSector(nDrive, i, j);
+        }
+    }
+}
+
 void ProcessCommand(char* psz)
 {
     char szParm1[16] = {""};
@@ -127,6 +265,18 @@ void ProcessCommand(char* psz)
         return;
     }
     
+    if (stricmp(szCmd, "DISKS") == 0)
+    {
+        ProcessDisksRequest();
+        return;
+    }
+
+    if (stricmp(szCmd, "DUMP") == 0)
+    {
+        ProcessDumpRequest();
+        return;
+    }
+
     puts("Unknown command");
     puts(szHelpText);
 }

@@ -210,7 +210,7 @@ typedef struct {
 typedef struct {
 	file* f;
 	char  szFileName[128];
-	int   nDriveFormat;
+	int   nDriveFormat;     // DMK or HFE
 	BYTE  byNumTracks;
 
 	union {
@@ -363,10 +363,11 @@ extern volatile BYTE  g_byIntrRequest;
 void FdcSaveBootCfg(char* pszIniFile);
 void FdcProcessStatusRequest(byte print);
 int  FdcGetDriveIndex(int nDriveSel);
+int  FdcGetSide(byte byDriveSel);
 
 void LoadHfeTrack(file* pFile, int nTrack, int nSide, HfeDriveType* pdisk, TrackType* ptrack, BYTE* pbyTrackData, int nMaxLen);
+void FdcReadTrack(int nDrive, int nSide, int nTrack);
 
-int  FdcGetDriveIndex(int nDriveSel);
 void FdcSetFlag(byte flag);
 void FdcClrFlag(byte flag);
 void FdcGenerateIntr(void);
