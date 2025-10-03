@@ -2021,28 +2021,8 @@ void InitDmkDiskHeader(void)
 		return;
 	}
 
-	memset(g_dtDives[nDrive].dmk.byDmkDiskHeader, 0, sizeof(g_dtDives[nDrive].dmk.byDmkDiskHeader));
-
-	if (g_FDC.byDoublerDensity)
-	{
-		g_tdTrack.byDensity = eDD;
-		g_dtDives[nDrive].dmk.wTrackLength = 6500;
-	}
-	else
-	{
-		g_tdTrack.byDensity = eSD;
-		g_dtDives[nDrive].dmk.byDmkDiskHeader[4] |= 0x40; // single density
-		g_dtDives[nDrive].dmk.wTrackLength = 3200;
-	}
-
-	g_dtDives[nDrive].dmk.byWriteProtected = 0;
-	g_dtDives[nDrive].dmk.byNumSides = 2;
-	g_dtDives[nDrive].byNumTracks = 40;
-
-	g_dtDives[nDrive].dmk.byDensity = g_tdTrack.byDensity;
+	g_dtDives[nDrive].byNumTracks = 1;
 	g_dtDives[nDrive].dmk.byDmkDiskHeader[1] = g_dtDives[nDrive].byNumTracks;
-	g_dtDives[nDrive].dmk.byDmkDiskHeader[2] = g_dtDives[nDrive].dmk.wTrackLength & 0xFF;
-	g_dtDives[nDrive].dmk.byDmkDiskHeader[3] = (g_dtDives[nDrive].dmk.wTrackLength >> 8) & 0xFF;
 
 	FileClose(g_dtDives[nDrive].f);
 	g_dtDives[nDrive].f = FileOpen(g_dtDives[nDrive].szFileName, FA_READ | FA_WRITE);
@@ -2068,12 +2048,12 @@ void FdcProcessWriteTrackCommand(void)
 	if (g_FDC.byDoublerDensity)
 	{
 		g_tdTrack.byDensity = eDD;
-		nWriteSize = 6214; // Tandy doubler track size
+		nWriteSize = DD_TRACK_LENGTH; // Tandy doubler track size
 	}
 	else
 	{
 		g_tdTrack.byDensity = eSD;
-		nWriteSize = 3105;
+		nWriteSize = SD_TRACK_LENGTH;
 	}
 
 	g_tdTrack.nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);

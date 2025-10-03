@@ -12,6 +12,9 @@ extern "C" {
 #define MAX_DRIVES 3
 #define DMK_HEADER_SIZE 16
 
+#define SD_TRACK_LENGTH 3105
+#define DD_TRACK_LENGTH 6214
+
 #define BLOCK_SIZE 512
 #define NUM_BLOCKS 32
 #define MAX_TRACK_SIZE (BLOCK_SIZE*NUM_BLOCKS)

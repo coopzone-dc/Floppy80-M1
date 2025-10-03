@@ -3,7 +3,7 @@
 ----------------------------------------------------
 CPM 1.4.1 (Lifeboat)  Yes      Yes     Yes    Yes
 CPM 1.5 (FMG)         Yes      Yes     Yes    Yes
-Double DOS 4.2.4      Yes      No      Yes    Yes
+Double DOS 4.2.4      Yes      Yes     Yes    Yes
 DOS Plus 3.50         Yes      Yes     Yes    Yes
 LDOS 5.3.1            Yes      Yes     Yes    Yes
 MultiDOS 4.01         Yes      Yes     Yes    Yes
@@ -33,7 +33,8 @@ VTDOS 4.0.1           Yes      Yes     Yes    Yes
 
 - Double DOS 4.2.4
   FORMAT
-  - DOUBLE FORMAT :2
+  - works
+    DOUBLE FORMAT :2
     DOUBLE BACKUP :0 TO :2
   COPY
   - "COPY FILENAME/EXT:0 TO FILENAME/EXT:2"
