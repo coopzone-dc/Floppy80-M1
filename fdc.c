@@ -34,13 +34,6 @@ int log_head = 0;
 int log_tail = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////
-// watch variable
-int drive;
-int side;
-int track;
-int sector;
-
-////////////////////////////////////////////////////////////////////////////////////
 /*
 
 For JV1 and JV3 format information see https://www.tim-mann.org/trs80/dskspec.html
@@ -164,6 +157,8 @@ IDAM/Sector header:
 		bySectorData[SectorOffset+2] side number      (should be the same as the nSide parameter)
 		bySectorData[SectorOffset+3] sector number    (should be the same as the nSector parameter)
 		bySectorData[SectorOffset+4] byte length (log 2, minus seven), 0 => 128 bytes; 1 => 256 bytes; etc.
+		bySectorData[SectorOffset+5] first CRC byte
+		bySectorData[SectorOffset+6] second CRC byte
 
 	For Single Density
 
@@ -172,6 +167,8 @@ IDAM/Sector header:
 		bySectorData[SectorOffset+2] side number      (should be the same as the nSide parameter)
 		bySectorData[SectorOffset+3] sector number    (should be the same as the nSector parameter)
 		bySectorData[SectorOffset+4] byte length (log 2, minus seven), 0 => 128 bytes; 1 => 256 bytes; etc.
+		bySectorData[SectorOffset+5] first CRC byte
+		bySectorData[SectorOffset+6] second CRC byte
 
 DAM marker values:
 
@@ -639,12 +636,8 @@ WORD FdcGetIDAM(int nSector)
 }
 
 //-----------------------------------------------------------------------------
-// determines the index of the Data Address Mark for the specified logical sector.
-//
-// returns the index of the 0xFE byte in the sector byte sequence 0xA1, 0xA1, 0xA1, 0xFE
-// in the g_tdTrack.byTrackData[] address for the specified sector.
-//
-int FdcGetSectorDataOffset(int nSide, int nTrack, int nSector)
+// determines the index of the Index Mark (0xFE) for the specified logical sector.
+int FdcGetSectorIndexOffset(int nSide, int nTrack, int nSector)
 {
 	BYTE* pby;
 	WORD  wIDAM;
@@ -655,9 +648,6 @@ int FdcGetSectorDataOffset(int nSide, int nTrack, int nSector)
 		wIDAM   = FdcGetIDAM(i);
 		nOffset = wIDAM & 0x3FFF;
 
-		// bySectorData[nOffset-3] should be 0xA1
-		// bySectorData[nOffset-2] should be 0xA1
-		// bySectorData[nOffset-1] should be 0xA1
 		// bySectorData[nOffset]   should be 0xFE
 		// bySectorData[nOffset+1] is track address (should be the same as the nTrack parameter)
 		// bySectorData[nOffset+2] side number		(should be the same as the nSide parameter)
@@ -689,7 +679,7 @@ int FdcGetSectorDataOffset(int nSide, int nTrack, int nSector)
 // returns TRUE if the byte sequence starting at pbt is one of the following
 //					- 0xA1, 0xA1, 0xA1, 0xFB
 //					- 0xA1, 0xA1, 0xA1, 0xF8
-//		   FALSE is it is not
+//		   FALSE if it is not
 //
 BYTE FdcIsDataStartPatern(BYTE* pby)
 {
@@ -723,16 +713,17 @@ BYTE FdcIsDataStartPatern(BYTE* pby)
 }
 
 //-----------------------------------------------------------------------------
-int FdcGetDataSize(TrackType* ptdTrack, int nDataOffset)
+// nSectorIndexMarkOffset is the offset to the 0xFE IDAM byte
+int FdcGetDataSize(TrackType* ptdTrack, int nSectorIndexMarkOffset)
 {
 	BYTE* pby;
 	
-	if (nDataOffset < 0)
+	if (nSectorIndexMarkOffset < 0)
 	{
 		return 1;
 	}
 
-	pby = ptdTrack->byTrackData+nDataOffset;
+	pby = ptdTrack->byTrackData + nSectorIndexMarkOffset;
 
 	if ((*pby == 0xFE) && (*(pby+1) == 0xFE))
 	{
@@ -743,45 +734,47 @@ int FdcGetDataSize(TrackType* ptdTrack, int nDataOffset)
 }
 
 //-----------------------------------------------------------------------------
-int FdcGetDAM_Offset(TrackType* ptdTrack, int nDataOffset, int nDataSize)
+// ptdTrack->byTrackData+nSectorIndexMarkOffset should point to 0xFE (IDAM)
+int FdcGetSectorDataOffset(TrackType* ptdTrack, int nSectorIndexMarkOffset, int nDataSize)
 {
 	BYTE* pby;
 	
-	if (nDataOffset < 0)
+	if (nSectorIndexMarkOffset < 0)
 	{
 		return -1;
 	}
 
-	nDataOffset = nDataOffset + 7 * nDataSize;
+	// skip past 0xFE, track, side, sector, sector size, and two byte CRC
+	int nSectorDataMarkOffset = nSectorIndexMarkOffset + 7 * nDataSize;
 
 	if ((nDataSize == 1) && (ptdTrack->byDensity == eDD)) // double density
 	{
 		// locate the byte sequence 0xA1, 0xA1, 0xA1, 0xFB/0xF8
-		while (nDataOffset < ptdTrack->nTrackSize)
+		while (nSectorDataMarkOffset < ptdTrack->nTrackSize)
 		{
-			if (FdcIsDataStartPatern(g_tdTrack.byTrackData+nDataOffset))
+			if (FdcIsDataStartPatern(g_tdTrack.byTrackData+nSectorDataMarkOffset))
 			{
-				return nDataOffset;
+				return nSectorDataMarkOffset + 3;
 			}
 			else
 			{
-				++nDataOffset;
+				++nSectorDataMarkOffset;
 			}
 		}
 	}
 	else // single density
 	{
-		while (nDataOffset < ptdTrack->nTrackSize)
+		while (nSectorDataMarkOffset < ptdTrack->nTrackSize)
 		{
-			pby = g_tdTrack.byTrackData+nDataOffset;
+			pby = g_tdTrack.byTrackData+nSectorDataMarkOffset;
 
 			if ((*pby == 0xFA) || (*pby == 0xFB) || (*pby == 0xF8) || (*pby == 0xF9))
 			{
-				return nDataOffset;
+				return nSectorDataMarkOffset;
 			}
 			else
 			{
-				nDataOffset += nDataSize;
+				nSectorDataMarkOffset += nDataSize;
 			}
 		}
 	}
@@ -796,9 +789,9 @@ void FdcFillSectorOffset(TrackType* ptdTrack)
 	
 	for (i = 0; i < 0x80; ++i)
 	{
-		ptdTrack->nDataOffset[i] = FdcGetSectorDataOffset(ptdTrack->nSide, ptdTrack->nTrack, i);
-		ptdTrack->nDataSize[i]   = FdcGetDataSize(ptdTrack, ptdTrack->nDataOffset[i]);
-		ptdTrack->nDAM[i]        = FdcGetDAM_Offset(ptdTrack, ptdTrack->nDataOffset[i], ptdTrack->nDataSize[i]);
+		ptdTrack->nSectorIndexMarkOffset[i] = FdcGetSectorIndexOffset(ptdTrack->nSide, ptdTrack->nTrack, i);
+		ptdTrack->nDataSize[i]              = FdcGetDataSize(ptdTrack, ptdTrack->nSectorIndexMarkOffset[i]);
+		ptdTrack->nSectorDataMarkOffset[i]  = FdcGetSectorDataOffset(ptdTrack, ptdTrack->nSectorIndexMarkOffset[i], ptdTrack->nDataSize[i]);
 	}
 }
 
@@ -808,13 +801,6 @@ void FdcReadDmkTrack(int nDrive, int nSide, int nTrack)
 	int nTrackOffset;
 	
 	g_tdTrack.nType = eDMK;
-
-	if ((nDrive == 2) && (nTrack == 0))
-	{
-		drive = nDrive;
-		side = nSide;
-		track = nTrack;
-	}
 
 	// check if specified track is already in memory
 	if ((g_tdTrack.nDrive == nDrive) && (g_tdTrack.nSide == nSide) && (g_tdTrack.nTrack == nTrack))
@@ -916,18 +902,29 @@ void FdcReadTrack(int nDrive, int nSide, int nTrack)
 }
 
 //-----------------------------------------------------------------------------
-int FindSectorIndex(int nSector, TrackType* ptrack)
+int FindSectorIndex(int nSector, TrackType* pTrack)
 {
-	int i, nOffset;
+	int i, nOffset, nDataSize;
+	BYTE* pby;
 
 	// locate sector
 	for (i = 0; i < MAX_SECTORS_PER_TRACK; ++i)
 	{
-		nOffset = ptrack->nDataOffset[i]+6;
+		pby = pTrack->byTrackData + pTrack->nSectorIndexMarkOffset[i];
 
-		if ((nOffset < sizeof(ptrack->byTrackData)) && (ptrack->byTrackData[nOffset] == nSector))
+		if ((*pby == 0xFE) && (*(pby+1) == 0xFE))
 		{
-			return i;
+			if (*(pby+6) == nSector)
+			{
+				return i;
+			}
+		}
+		else
+		{
+			if (*(pby+3) == nSector)
+			{
+				return i;
+			}
 		}
 	}
 
@@ -935,22 +932,11 @@ int FindSectorIndex(int nSector, TrackType* ptrack)
 }
 
 //-----------------------------------------------------------------------------
-WORD FdcGetDmkSectorCRC(int nDrive, int nDataOffset, int nDensityAdjust, int nDataSize)
-{
-	WORD wCRC16;
-
-	wCRC16  = g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+1*nDataSize] << 8;
-	wCRC16 += g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+2*nDataSize];
-
-	return wCRC16;
-}
-
-//-----------------------------------------------------------------------------
 int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 {
 	BYTE* pby;
 	WORD  wCalcCRC16;
-	int   nDrive, nDataOffset, nDensityAdjust;
+	int   nDrive, nSectorDataMarkOffset, nDensityAdjust;
 	int   nDataSize = 1;
 	int   ret = FDC_READ_SECTOR_SUCCESS;
 
@@ -965,12 +951,8 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	FdcReadTrack(nDrive, nSide, nTrack);
 
-	g_tdTrack.nFileOffset = FdcGetTrackOffset(nDrive, nSide, nTrack);
-
-	int nOffset = g_tdTrack.nDataOffset[nSector];
-
-	// get pointer to start of sector data
-	pby = g_tdTrack.byTrackData + nOffset;
+	// get pointer to (0xFE byte) start of sector address data (IDAM)
+	pby = g_tdTrack.byTrackData + g_tdTrack.nSectorIndexMarkOffset[nSector];
 
 	if ((*pby == 0xFE) && (*(pby+1) == 0xFE))
 	{
@@ -1002,9 +984,8 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 	// g_FDC.byTrackData[g_FDC.nSectorOffset+5..6] CRC (calculation starts with the three 0xA1/0xF5 bytes preceeding the 0xFE)
 	FdcClrFlag(eCrcError);
 
-	if (g_tdTrack.nDataOffset[nSector] <= 0)
+	if (g_tdTrack.nSectorIndexMarkOffset[nSector] <= 0)
 	{
-		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcSetFlag(eNotFound);
 		return FDC_SECTOR_NOT_FOUND;
 	}
@@ -1026,8 +1007,8 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 	}
 
 	WORD wCRC16  = 0;
-	int  nIndex1 = g_tdTrack.nDataOffset[nSector]+5*nDataSize;
-	int  nIndex2 = g_tdTrack.nDataOffset[nSector]+6*nDataSize;
+	int  nIndex1 = g_tdTrack.nSectorIndexMarkOffset[nSector]+5*nDataSize;
+	int  nIndex2 = g_tdTrack.nSectorIndexMarkOffset[nSector]+6*nDataSize;
 
 	if ((nIndex1 < sizeof(g_tdTrack.byTrackData)) && (nIndex2 < sizeof(g_tdTrack.byTrackData)))
 	{
@@ -1040,44 +1021,40 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 		ret = FDC_CRC_ERROR;
 	}
 
-	nDataOffset = g_tdTrack.nDAM[nSector];	// offset to first bytes of the sector data mark sequence (0xA1, 0xA1, 0xA1, 0xFB/0xF8)
-											//  - 0xFB (regular data); or
-											//  - 0xF8 (deleted data)
-											// actual data starts after the 0xFB/0xF8 byte
-	if (nDataOffset < 0)
+	// offset to the 0xFB/0xF8 byte of the sector data mark sequence (0xA1, 0xA1, 0xA1, 0xFB/0xF8)
+	// CRC starts at first 0xA1 byte
+	nSectorDataMarkOffset = g_tdTrack.nSectorDataMarkOffset[nSector];
+
+	if (nSectorDataMarkOffset < 0)
 	{
-		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcSetFlag(eNotFound);
 		return FDC_SECTOR_NOT_FOUND;
 	}
 
-	// for double density drives nDataOffset is the index of the first 0xA1 byte in the 0xA1, 0xA1, 0xA1, 0xFB/0xF8 sequence
-	//
 	// for single density 0xA1, 0xA1 and 0xA1 are not present, CRC starts at the data mark (0xFB/0xF8)
 
-	g_FDC.byRecordMark           = g_tdTrack.byTrackData[nDataOffset+nDensityAdjust*nDataSize];
-	g_stSector.nSectorDataOffset = nDataOffset + (nDensityAdjust + 1) * nDataSize;
+	g_FDC.byRecordMark = g_tdTrack.byTrackData[nSectorDataMarkOffset+nDensityAdjust*nDataSize];
 	FdcClrFlag(eNotFound);
 	FdcSetRecordType(0xFB);	// will get set to g_FDC.byRecordMark after a few status reads
 
 	// perform a CRC on the sector data (including preceeding 4 bytes) and validate
-	wCalcCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nDataOffset], g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+1, nDataSize);
+	wCalcCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nSectorDataMarkOffset], g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+1, nDataSize);
 
 	if (nDataSize == 2)
 	{
 		int nCrcOffset = g_dtDives[nDrive].dmk.nSectorSize * nDataSize;
-		wCRC16  = g_tdTrack.byTrackData[nDataOffset+nCrcOffset+2] << 8;
-		wCRC16 += g_tdTrack.byTrackData[nDataOffset+nCrcOffset+4];
+		wCRC16  = g_tdTrack.byTrackData[nSectorDataMarkOffset+nCrcOffset+2] << 8;
+		wCRC16 += g_tdTrack.byTrackData[nSectorDataMarkOffset+nCrcOffset+4];
 	}
 	else if (g_tdTrack.byDensity == eDD) // double density
 	{
-		wCRC16  = g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+1] << 8;
-		wCRC16 += g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+2];
+		wCRC16  = g_tdTrack.byTrackData[nSectorDataMarkOffset+g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+1] << 8;
+		wCRC16 += g_tdTrack.byTrackData[nSectorDataMarkOffset+g_dtDives[nDrive].dmk.nSectorSize+nDensityAdjust+2];
 	}
 	else
 	{
-		wCRC16  = g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+1] << 8;
-		wCRC16 += g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+2];
+		wCRC16  = g_tdTrack.byTrackData[nSectorDataMarkOffset+g_dtDives[nDrive].dmk.nSectorSize+1] << 8;
+		wCRC16 += g_tdTrack.byTrackData[nSectorDataMarkOffset+g_dtDives[nDrive].dmk.nSectorSize+2];
 	}
 
 	if (wCalcCRC16 != wCRC16)
@@ -1094,7 +1071,7 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 {
 	BYTE* pby;
 	WORD  wCalcCRC16;
-	int   nDrive, nDataOffset;
+	int   nDrive, nSectorDataMarkOffset;
 
 	g_FDC.nDataSize = 1;
 
@@ -1107,10 +1084,8 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	FdcReadTrack(nDrive, nSide, nTrack);
 
-	g_tdTrack.nFileOffset = FdcGetTrackOffset(nDrive, nSide, nTrack);
-
 	// get pointer to start of sector data
-	int nOffset = g_tdTrack.nDataOffset[nSector];
+	int nOffset = g_tdTrack.nSectorIndexMarkOffset[nSector];
 
 	pby = g_tdTrack.byTrackData + nOffset;
 
@@ -1129,9 +1104,8 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 	// g_FDC.byTrackData[g_FDC.nSectorOffset+5..6] CRC (calculation starts with the three 0xA1/0xF5 bytes preceeding the 0xFE)
 	FdcClrFlag(eCrcError);
 
-	if (g_tdTrack.nDataOffset[nSector] <= 0)
+	if (g_tdTrack.nSectorIndexMarkOffset[nSector] <= 0)
 	{
-		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcSetFlag(eNotFound);
 		return;
 	}
@@ -1139,8 +1113,8 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 	wCalcCRC16 = Calculate_CRC_CCITT(pby-3, 8, 1);
 	
 	WORD wCRC16  = 0;
-	int  nIndex1 = g_tdTrack.nDataOffset[nSector]+5;
-	int  nIndex2 = g_tdTrack.nDataOffset[nSector]+6;
+	int  nIndex1 = g_tdTrack.nSectorIndexMarkOffset[nSector]+5;
+	int  nIndex2 = g_tdTrack.nSectorIndexMarkOffset[nSector]+6;
 
 	if ((nIndex1 < sizeof(g_tdTrack.byTrackData)) && (nIndex2 < sizeof(g_tdTrack.byTrackData)))
 	{
@@ -1152,29 +1126,25 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 		FdcSetFlag(eCrcError);
 	}
 	
-	nDataOffset = g_tdTrack.nDAM[nSector];	// offset to first bytes of the sector data mark sequence (0xA1, 0xA1, 0xA1, 0xFB/0xF8)
-											//  - 0xFB (regular data); or
-											//  - 0xF8 (deleted data)
-											// actual data starts after the 0xFB/0xF8 byte
-	if (nDataOffset < 0)
+	// offset to the 0xFB/0xF8 byte of the sector data mark sequence (0xA1, 0xA1, 0xA1, 0xFB/0xF8)
+	// CRC starts at first 0xA1 byte
+	nSectorDataMarkOffset = g_tdTrack.nSectorDataMarkOffset[nSector];
+
+	if (nSectorDataMarkOffset < 0)
 	{
-		g_stSector.nSectorDataOffset = 0; // then there is a problem and we will let the Z80 deal with it
 		FdcSetFlag(eNotFound);
 		return;
 	}
 
-	// nDataOffset is the index of the first 0xA1 byte in the 0xA1, 0xA1, 0xA1, 0xFB/0xF8 sequence
-
-	g_FDC.byRecordMark           = g_tdTrack.byTrackData[nDataOffset+3];
-	g_stSector.nSectorDataOffset = nDataOffset + 4;
+	g_FDC.byRecordMark = g_tdTrack.byTrackData[nSectorDataMarkOffset];
 	FdcClrFlag(eNotFound);
 	FdcSetRecordType(0xFB);	// will get set to g_FDC.byRecordMark after a few status reads
 
-	// perform a CRC on the sector data (including preceeding 4 bytes) and validate
-	wCalcCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nDataOffset], g_dtDives[nDrive].dmk.nSectorSize+4, 1);
+	// perform a CRC on the sector data (including preceeding 3 bytes) and validate
+	wCalcCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nSectorDataMarkOffset-3], g_dtDives[nDrive].dmk.nSectorSize+4, 1);
 
-	wCRC16  = g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+4] << 8;
-	wCRC16 += g_tdTrack.byTrackData[nDataOffset+g_dtDives[nDrive].dmk.nSectorSize+5];
+	wCRC16  = g_tdTrack.byTrackData[nSectorDataMarkOffset+g_dtDives[nDrive].dmk.nSectorSize+1] << 8;
+	wCRC16 += g_tdTrack.byTrackData[nSectorDataMarkOffset+g_dtDives[nDrive].dmk.nSectorSize+2];
 
 	if (wCalcCRC16 != wCRC16)
 	{
@@ -1209,10 +1179,11 @@ void FdcReadHfeSector(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	i = FindSectorIndex(nSector, &g_tdTrack);
 
-	g_FDC.byRecordMark           = g_tdTrack.byTrackData[g_tdTrack.nDAM[i] + 3];
-	g_stSector.nSectorDataOffset = g_tdTrack.nDAM[FindSectorIndex(nSector, &g_tdTrack)] + 4;
+	// offset to the 0xFB/0xF8 byte of the sector data mark sequence (0xA1, 0xA1, 0xA1, 0xFB/0xF8)
+	// CRC starts at first 0xA1 byte
+	g_FDC.byRecordMark = g_tdTrack.byTrackData[g_tdTrack.nSectorDataMarkOffset[i] + 3]; // 0xFB/0xF8
 	
-	int nOffset = g_tdTrack.nDataOffset[i] + 7;
+	int nOffset = g_tdTrack.nSectorIndexMarkOffset[i] + 4;
 
 	if (nOffset < sizeof(g_tdTrack.byTrackData))
 	{
@@ -1233,14 +1204,6 @@ void FdcReadSector(int nDriveSel, int nSide, int nTrack, int nSector)
 	int nDrive;
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
-
-	if ((nDrive == 2) && (nTrack == 0x11))
-	{
-		drive = nDrive;
-		side = nSide;
-		track = nTrack;
-		sector = nSector;
-	}
 
 	FdcReadTrack(nDrive, nSide, nTrack);
 
@@ -1873,7 +1836,7 @@ void FdcProcessReadSectorCommand(void)
 	// number of byte to be transfered to the computer before
 	// setting the Data Address Mark status bit (1 if Deleted Data)
 	g_tdTrack.nReadSize     = g_stSector.nSectorSize;
-	g_tdTrack.pbyReadPtr    = g_tdTrack.byTrackData + g_stSector.nSectorDataOffset;
+	g_tdTrack.pbyReadPtr    = g_tdTrack.byTrackData + g_tdTrack.nSectorDataMarkOffset[g_FDC.bySector] + g_tdTrack.nDataSize[g_FDC.bySector];
 	g_tdTrack.nReadCount    = g_tdTrack.nReadSize;
 	g_FDC.nServiceState     = 0;
 	g_FDC.nProcessFunction  = psReadSector;
@@ -1886,7 +1849,20 @@ void FdcProcessReadSectorCommand(void)
 }
 
 //-----------------------------------------------------------------------------
-// Command code 1 0 1 m b E a1 a0
+// FD1771 Command code 1 0 1 m b E a1 a0
+//
+// m = 0 - single record read;
+//     1 - multiple record read;
+// b = 0 - Non-IBM format;
+//     1 - IDM format;
+// E = 0 - no delay;
+//     1 - 15 ms delay;
+// a1/a0 = 00 - 0xFB (Data Mark);
+//         01 - 0xFA (user defined);
+//         10 - 0xF9 (use defined);
+//         11 - 0xF8 (Deleted Data Mark);
+//
+// WD1791 Command code 1 0 1 m F2 E F1 a0
 //
 // m = 0 - single record read;
 //     1 - multiple record read;
@@ -1903,11 +1879,21 @@ void FdcProcessWriteSectorCommand(void)
 {
 	int nSide  = FdcGetSide(g_FDC.byDriveSel);
 	int nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
-	uint8_t address_mark[] = {0xFB, 0xFA, 0xF9, 0xF8};
+	uint8_t address_mark_sd[] = {0xFB, 0xFA, 0xF9, 0xF8};
+	uint8_t address_mark_dd[] = {0xFB, 0xF8};
 
 	g_FDC.byCommandType = 2;
-	FdcSetRecordType(address_mark[g_FDC.byCurCommand & 0x03]);
-	g_stSector.bySectorDataAddressMark = address_mark[g_FDC.byCurCommand & 0x03];
+
+	if (g_tdTrack.byDensity == eDD)
+	{
+		FdcSetRecordType(address_mark_dd[g_FDC.byCurCommand & 0x01]);
+		g_stSector.bySectorDataAddressMark = address_mark_dd[g_FDC.byCurCommand & 0x01];
+	}
+	else
+	{
+		FdcSetRecordType(address_mark_sd[g_FDC.byCurCommand & 0x03]);
+		g_stSector.bySectorDataAddressMark = address_mark_sd[g_FDC.byCurCommand & 0x03];
+	}
 
 	// read specified sector so that it can be modified
 	FdcReadSector(g_FDC.byDriveSel, nSide, g_FDC.byTrack, g_FDC.bySector);
@@ -1917,8 +1903,18 @@ void FdcProcessWriteSectorCommand(void)
 
 	g_stSector.nSector     = g_FDC.bySector;
 	g_stSector.nSectorSize = g_dtDives[nDrive].dmk.nSectorSize;
-	g_tdTrack.nFileOffset  = FdcGetTrackOffset(nDrive, nSide, g_FDC.byTrack);
-	g_tdTrack.pbyWritePtr  = g_tdTrack.byTrackData + g_stSector.nSectorDataOffset;
+
+	if (g_tdTrack.byDensity == eDD)
+	{
+		g_tdTrack.pbyWritePtr = g_tdTrack.byTrackData + g_tdTrack.nSectorDataMarkOffset[g_FDC.bySector] + 1;
+	}
+	else
+	{
+		g_tdTrack.pbyWritePtr = g_tdTrack.byTrackData +
+								g_tdTrack.nSectorDataMarkOffset[g_FDC.bySector] +
+								g_tdTrack.nDataSize[g_FDC.bySector];
+	}
+
 	g_tdTrack.nWriteCount  = g_stSector.nSectorSize;
 	g_tdTrack.nWriteSize   = g_stSector.nSectorSize;	// number of byte to be transfered to the computer before
 														// setting the Data Address Mark status bit (1 if Deleted Data)
@@ -2306,70 +2302,14 @@ void FdcServiceReadTrack(void)
 }
 
 //-----------------------------------------------------------------------------
-void WriteDmkSectorData(int nSector)
-{
-	int  nDataOffset;
-
-	if ((g_tdTrack.nDrive < 0) || (g_tdTrack.nDrive >= MAX_DRIVES))
-	{
-		return;
-	}
-
-	if (g_dtDives[g_tdTrack.nDrive].f == NULL)
-	{
-		return;
-	}
-
-	// TODO: check to see if disk image is read only
-
-	nDataOffset = g_tdTrack.nDAM[nSector];
-
-	if (nDataOffset < 0)
-	{
-		return;
-	}
-	
-	FileSeek(g_dtDives[g_tdTrack.nDrive].f, g_tdTrack.nFileOffset+nDataOffset);
-
-	if (g_tdTrack.byDensity == eDD) // double density
-	{
-		FileWrite(g_dtDives[g_tdTrack.nDrive].f, g_tdTrack.byTrackData+nDataOffset, g_stSector.nSectorSize+6);
-	}
-	else // single density
-	{
-		FileWrite(g_dtDives[g_tdTrack.nDrive].f, g_tdTrack.byTrackData+nDataOffset, g_stSector.nSectorSize+3);
-	}
-
-	FileFlush(g_dtDives[g_tdTrack.nDrive].f);
-}
-
-//-----------------------------------------------------------------------------
-void WriteSectorData(int nSector)
-{
-	int nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
-
-	switch (g_dtDives[nDrive].nDriveFormat)
-	{
-		case eDMK:
-			WriteDmkSectorData(nSector);
-			break;
-
-		case eHFE:
-			break;
-	}
-}
-
-//-----------------------------------------------------------------------------
 void FdcGenerateSectorCRC(int nSector, int nSectorSize)
 {
 	WORD wCRC16;
-	int  nDataOffset;
+	int  nSectorDataIndexOffset;
 
-	// now locate the 0xA1, 0xA1, 0xA1, 0xFB sequence that marks the start of sector data
-
-	nDataOffset = g_tdTrack.nDAM[nSector];
+	nSectorDataIndexOffset = g_tdTrack.nSectorDataMarkOffset[nSector];
 	
-	if (nDataOffset < 0)
+	if (nSectorDataIndexOffset < 0)
 	{
 		return;
 	}
@@ -2377,93 +2317,41 @@ void FdcGenerateSectorCRC(int nSector, int nSectorSize)
 	if (g_tdTrack.byDensity == eDD) // double density
 	{
 		// CRC consists of the 0xA1, 0xA1, 0xA1, 0xFB sequence and the sector data
-		wCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nDataOffset], nSectorSize+4, 1);
-		g_tdTrack.byTrackData[nDataOffset+nSectorSize+4] = wCRC16 >> 8;
-		g_tdTrack.byTrackData[nDataOffset+nSectorSize+5] = wCRC16 & 0xFF;
+		wCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nSectorDataIndexOffset-3], nSectorSize+4, 1);
+		g_tdTrack.byTrackData[nSectorDataIndexOffset+nSectorSize+1] = wCRC16 >> 8;
+		g_tdTrack.byTrackData[nSectorDataIndexOffset+nSectorSize+2] = wCRC16 & 0xFF;
 	}
 	else // single density
 	{
-		wCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nDataOffset], nSectorSize+1, 1);
-		g_tdTrack.byTrackData[nDataOffset+nSectorSize+1] = wCRC16 >> 8;
-		g_tdTrack.byTrackData[nDataOffset+nSectorSize+2] = wCRC16 & 0xFF;
+		// CRC consists of the 0xFB/0xF8 and the sector data
+		wCRC16 = Calculate_CRC_CCITT(&g_tdTrack.byTrackData[nSectorDataIndexOffset], nSectorSize+1, 1);
+		g_tdTrack.byTrackData[nSectorDataIndexOffset+nSectorSize+1] = wCRC16 >> 8;
+		g_tdTrack.byTrackData[nSectorDataIndexOffset+nSectorSize+2] = wCRC16 & 0xFF;
 	}
 }
 
 //-----------------------------------------------------------------------------
 void FdcUpdateDataAddressMark(int nSector, int nSectorSize)
 {
-	int nDataOffset, i;
+	int nSectorDataMarkOffset, i;
 
-	// get offset of the 0xA1, 0xA1, 0xA1, 0xFB sequence that marks the start of sector data
+	// get offset of the 0xFb/0xF8 byte in the 0xA1, 0xA1, 0xA1, 0xFB/0xF8 sequence that marks the start of sector data
+	nSectorDataMarkOffset = g_tdTrack.nSectorDataMarkOffset[nSector];
 
-	nDataOffset = g_tdTrack.nDAM[nSector];
-
-	if (nDataOffset < 0)
+	if (nSectorDataMarkOffset < 0)
 	{
 		return;
 	}
-
-	// nDataOffset is the index of the first 0xA1 byte in the 0xA1, 0xA1, 0xA1, 0xFB sequence
 
 	// update sector data mark (0xFB/0xF8)
 
 	if (g_tdTrack.byDensity == eDD) // double density
 	{
-		for (i = 0; i < 4; ++i)
-		{
-			if (g_tdTrack.byTrackData[nDataOffset+i] != 0xA1)
-			{
-				g_tdTrack.byTrackData[nDataOffset+i] = g_stSector.bySectorDataAddressMark;
-				i = 4;
-			}
-		}
+		g_tdTrack.byTrackData[nSectorDataMarkOffset] = g_stSector.bySectorDataAddressMark;
 	}
 	else // single density
 	{
-		g_tdTrack.byTrackData[nDataOffset] = g_stSector.bySectorDataAddressMark;
-	}
-}
-
-//-----------------------------------------------------------------------------
-void FdcServiceWriteSector(void)
-{
-	switch (g_FDC.nServiceState)
-	{
-		case 0:
-			// indicate to the Z80 that we are ready for the first data byte
-			FdcGenerateDRQ();
-			++g_FDC.nServiceState;
-			break;
-
-		case 1:
-			if (g_tdTrack.nWriteCount > 0)
-			{
-				break;
-			}
-
-			FdcUpdateDataAddressMark(g_stSector.nSector, g_stSector.nSectorSize);
-			
-			// perform a CRC on the sector data (including preceeding 4 bytes) and update sector CRC value
-			FdcGenerateSectorCRC(g_stSector.nSector, g_stSector.nSectorSize);
-			
-			// flush sector to SD-Card
-			WriteSectorData(g_stSector.nSector);
-		
-			++g_FDC.nServiceState;
-			g_FDC.nStateTimer = 0;
-			break;
-		
-		case 2:
-			if (g_FDC.nStateTimer < 1000)
-			{
-				break;
-			}
-
-			FdcGenerateIntr();
-			FdcClrFlag(eBusy);
-			g_FDC.nServiceState    = 0;
-			g_FDC.nProcessFunction = psIdle;
-			break;
+		g_tdTrack.byTrackData[nSectorDataMarkOffset] = g_stSector.bySectorDataAddressMark;
 	}
 }
 
@@ -2572,7 +2460,7 @@ void FdcBuildIdamTable1771(TrackType* ptdTrack)
 
 	// reset IDAM table to 0's
 	memset(pbyTrackData, 0, 0x80);
-	memset(ptdTrack->nDataOffset, 0, sizeof(ptdTrack->nDataOffset));
+	memset(ptdTrack->nSectorIndexMarkOffset, 0, sizeof(ptdTrack->nSectorIndexMarkOffset));
 
 	// search track data for sectors (start at first byte after the last IDAM index)
 	nIndex = 128;
@@ -2598,7 +2486,7 @@ void FdcBuildIdamTable1771(TrackType* ptdTrack)
 		if (byFound)
 		{
 			// at this point nIndex contains the location of the first 0xA1 byte for DD; or at 0xFE for SD;
-			ptdTrack->nDataOffset[nIDAM] = nIndex;
+			ptdTrack->nSectorIndexMarkOffset[nIDAM] = nIndex;
 
 			*(pbyTrackData + nIDAM * 2)     = nIndex & 0xFF;
 			*(pbyTrackData + nIDAM * 2 + 1) = nIndex >> 8;
@@ -2620,7 +2508,7 @@ void FdcBuildIdamTable1791(TrackType* ptdTrack)
 
 	// reset IDAM table to 0's
 	memset(pbyTrackData, 0, 0x80);
-	memset(ptdTrack->nDataOffset, 0, sizeof(ptdTrack->nDataOffset));
+	memset(ptdTrack->nSectorIndexMarkOffset, 0, sizeof(ptdTrack->nSectorIndexMarkOffset));
 
 	// search track data for sectors (start at first byte after the last IDAM index)
 	nIndex = 128;
@@ -2658,7 +2546,7 @@ void FdcBuildIdamTable1791(TrackType* ptdTrack)
 				nIndex += 3; // The IDAM pointer is the offset from the start of track data to the 0xFE of the associated sector.
 			}
 
-			ptdTrack->nDataOffset[nIDAM] = nIndex;
+			ptdTrack->nSectorIndexMarkOffset[nIDAM] = nIndex;
 
 			*(pbyTrackData + nIDAM * 2)     = nIndex & 0xFF;
 			*(pbyTrackData + nIDAM * 2 + 1) = nIndex >> 8;
@@ -2676,7 +2564,7 @@ void FdcBuildDataSizeTable(TrackType* ptdTrack)
 	
 	for (i = 0; i < 0x80; ++i)
 	{
-		ptdTrack->nDataSize[i] = FdcGetDataSize(ptdTrack, ptdTrack->nDataOffset[i]);
+		ptdTrack->nDataSize[i] = FdcGetDataSize(ptdTrack, ptdTrack->nSectorIndexMarkOffset[i]);
 	}
 }
 
@@ -2687,7 +2575,7 @@ void FdcBuildDamTable(TrackType* ptdTrack)
 	
 	for (i = 0; i < 0x80; ++i)
 	{
-		ptdTrack->nDAM[i] = FdcGetDAM_Offset(ptdTrack, ptdTrack->nDataOffset[i], ptdTrack->nDataSize[i]);
+		ptdTrack->nSectorDataMarkOffset[i] = FdcGetSectorDataOffset(ptdTrack, ptdTrack->nSectorIndexMarkOffset[i], ptdTrack->nDataSize[i]);
 	}
 }
 
@@ -2743,9 +2631,9 @@ void FdcWriteDmkTrack(TrackType* ptdTrack)
 		FileWrite(g_dtDives[ptdTrack->nDrive].f, g_dtDives[ptdTrack->nDrive].dmk.byDmkDiskHeader, sizeof(g_dtDives[ptdTrack->nDrive].dmk.byDmkDiskHeader));
 	}
 
-	ptdTrack->nFileOffset = FdcGetTrackOffset(ptdTrack->nDrive, ptdTrack->nSide, ptdTrack->nTrack);
+	int nFileOffset = FdcGetTrackOffset(ptdTrack->nDrive, ptdTrack->nSide, ptdTrack->nTrack);
 
-	FileSeek(g_dtDives[ptdTrack->nDrive].f, ptdTrack->nFileOffset);
+	FileSeek(g_dtDives[ptdTrack->nDrive].f, nFileOffset);
 	FileWrite(g_dtDives[ptdTrack->nDrive].f, ptdTrack->byTrackData, ptdTrack->nTrackSize);
 	FileFlush(g_dtDives[ptdTrack->nDrive].f);
 }
@@ -2760,6 +2648,49 @@ void FdcWriteTrack(TrackType* ptdTrack)
 			break;
 
 		case eHFE:
+			break;
+	}
+}
+
+//-----------------------------------------------------------------------------
+void FdcServiceWriteSector(void)
+{
+	switch (g_FDC.nServiceState)
+	{
+		case 0:
+			// indicate to the Z80 that we are ready for the first data byte
+			FdcGenerateDRQ();
+			++g_FDC.nServiceState;
+			break;
+
+		case 1:
+			if (g_tdTrack.nWriteCount > 0)
+			{
+				break;
+			}
+
+			FdcUpdateDataAddressMark(g_stSector.nSector, g_stSector.nSectorSize);
+			
+			// perform a CRC on the sector data (including preceeding 4 bytes) and update sector CRC value
+			FdcGenerateSectorCRC(g_stSector.nSector, g_stSector.nSectorSize);
+			
+			// flush track to SD-Card
+			FdcWriteTrack(&g_tdTrack);
+		
+			++g_FDC.nServiceState;
+			g_FDC.nStateTimer = 0;
+			break;
+		
+		case 2:
+			if (g_FDC.nStateTimer < 1000)
+			{
+				break;
+			}
+
+			FdcGenerateIntr();
+			FdcClrFlag(eBusy);
+			g_FDC.nServiceState    = 0;
+			g_FDC.nProcessFunction = psIdle;
 			break;
 	}
 }

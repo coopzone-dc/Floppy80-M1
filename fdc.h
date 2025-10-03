@@ -233,11 +233,9 @@ typedef struct {
 	int nWriteCount;
 	int nWriteSize;
 
-	int nFileOffset;              // byte offset from the start of the file to the start of this track
-
-	int  nDataSize[0x80];         // byte per data entry (1 = single; or 2=double byte data)
-	int  nDataOffset[0x80];       // byte offset from start of track buffer for each ID Address Mark
-	int  nDAM[0x80];              // byte offset from start of track buffer for each Data Address Mark
+	int nDataSize[0x80];              // byte per data entry (1 = single; or 2=double byte data)
+	int nSectorIndexMarkOffset[0x80]; // byte offset from start of track buffer for each ID Address Mark
+	int nSectorDataMarkOffset[0x80];  // byte offset from start of track buffer for each Data Address Mark
 
 	BYTE* pbyReadPtr;
 	BYTE* pbyWritePtr;
@@ -251,7 +249,6 @@ typedef struct {
 typedef struct {
 	int   nSector;
 	int   nSectorSize;
-	int   nSectorDataOffset;		// offset from the start of the track buffer of the first data byte of the sector specified by nSector
 	BYTE  bySectorDataAddressMark;
 } SectorType;
 

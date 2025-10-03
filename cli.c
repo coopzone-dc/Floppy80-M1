@@ -103,24 +103,60 @@ void ProcessDisksRequest(void)
 
 void DumpSector(int nDrive, int nTrack, int nSector)
 {
-    int nOffset = g_tdTrack.nDataOffset[nSector];
-    int nSectorSize = 256; //g_dtDives[nDrive].dmk.byDmkDiskHeader[1];
-    int i;
+    int nOffset = g_tdTrack.nSectorIndexMarkOffset[nSector];
 
     if (nOffset < 0)
     {
         return;
     }
 
-    printf("Drive %d, Track %d, Sector %d\r\n", nDrive, nTrack, nSector);
-    sleep_ms(1);
-
     BYTE* pby = g_tdTrack.byTrackData + nOffset - 3;
+    int   i = 1;
+    int   state = 0;
+    int   size = 512;
+    int   nDataSize = 1;
 
-    // dump to the 0xFE byte
-    for (i = 1; i <= 256; ++i)
+    while (i <= size)
     {
         printf("%02X ", *pby);
+
+        switch (state)
+        {
+            case 0:
+                if (*pby == 0xFE)
+                {
+                    if (*(pby+1) == 0xFE)
+                    {
+                        nDataSize = 2;
+                    }
+
+                    printf("%02X %02X %02X %02X %02X %02X\r\n"
+                           "DRV: %02X TRK: %02X S: %02X SEC: %02X LEN: %02X CRC: %02X%02X",
+                           *(pby+1*nDataSize), *(pby+2*nDataSize), *(pby+3*nDataSize),
+                           *(pby+4*nDataSize), *(pby+5*nDataSize), *(pby+6*nDataSize),
+                           nDrive, *(pby+1*nDataSize), *(pby+2*nDataSize), *(pby+3*nDataSize),
+                           *(pby+4*nDataSize), *(pby+5*nDataSize), *(pby+6*nDataSize));
+                    size = 128 << *(pby+4*nDataSize);
+                    i = 0;
+                    pby += 7*nDataSize;
+                    ++state;
+                }
+
+                break;
+
+            case 1:
+                if ((*pby == 0xFB) || (*pby == 0xF8))
+                {
+                    printf("\r\nSector data");
+                    i = 0;
+                    ++state;
+                }
+
+                break;
+
+            case 2:
+                break;
+        }
 
         if ((i % 16) == 0)
         {
@@ -128,93 +164,36 @@ void DumpSector(int nDrive, int nTrack, int nSector)
             sleep_ms(5);
         }
 
-        if (*pby == 0xFE)
-        {
-            i = 256;
-        }
-        else
-        {
-            ++pby;
-        }
+        pby += nDataSize;
+        ++i;
     }
 
-    printf("\r\n");
-
-    if (*pby != 0xFE)
-    {
-        return;
-    }
-
-    ++pby;
-    printf("Track %d, Side %d, Sector %d, Length %d\r\n",
-            *pby, *(pby+1), *(pby+2), *(pby+3));
-    sleep_ms(5);
-
-    nSectorSize = 128 << *(pby+3);
-    
-    pby += 4;
-
-    // dump to the 0xFB byte
-    for (i = 1; i <= 256; ++i)
-    {
-        printf("%02X ", *pby);
-
-        if ((i % 16) == 0)
-        {
-            printf("\r\n");
-            sleep_ms(5);
-        }
-
-        if (*pby == 0xFB)
-        {
-            i = 256;
-        }
-        else
-        {
-            ++pby;
-        }
-    }
-
-    printf("\r\n");
-
-    if (*pby != 0xFB)
-    {
-        return;
-    }
-
-    ++pby;
-
-    for (i = 1; i <= nSectorSize; ++i)
-    {
-        printf("%02X ", *pby);
-        ++pby;
-
-        if ((i % 16) == 0)
-        {
-            printf("\r\n");
-            sleep_ms(5);
-        }
-    }
-
-    printf("\r\n");
+    printf("CRC: %02X %02X\r\n\r\n", *pby, *(pby+1*nDataSize));
     sleep_ms(5);
 }
 
 void ProcessDumpRequest(void)
 {
-    int nDrive  = 2;
+    int nDrive  = 0;
     int nTracks = g_dtDives[nDrive].dmk.byDmkDiskHeader[1];
-    int i, j;
+    int i, j, k;
+    int nSides = 2;
+
+    if (g_dtDives[nDrive].dmk.byDmkDiskHeader[4] & 0x10)
+    {
+        nSides = 1;
+    }
 
     for (i = 0; i < nTracks; ++i)
     {
-    	FdcReadTrack(nDrive, 0, i);
-
-        printf("Track %d\r\n", i);
-
-        for (j = 0; j < 64; ++j)
+        for (k = 0; k < nSides; ++k)
         {
-            DumpSector(nDrive, i, j);
+            FdcReadTrack(nDrive, k, i);
+
+            for (j = 0; j < 64; ++j)
+            {
+                DumpSector(nDrive, i, j);
+            }
         }
     }
 }
