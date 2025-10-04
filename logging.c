@@ -9,6 +9,8 @@
 #include "fdc.h"
 #include "cli.h"
 
+#ifdef ENABLE_LOGGING
+
 extern FdcDriveType g_dtDives[MAX_DRIVES];
 
 static uint8_t  g_byRwIndex = 0;
@@ -474,3 +476,5 @@ void ServiceFdcLog(void)
     ++log_tail;
 	log_tail = log_tail % LOG_SIZE;
 }
+
+#endif

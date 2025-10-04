@@ -27,9 +27,11 @@
 	#define __not_in_flash_func(x) x
 #endif
 
-LogType fdc_log[LOG_SIZE];
-int log_head = 0;
-int log_tail = 0;
+#ifdef ENABLE_LOGGING
+	LogType fdc_log[LOG_SIZE];
+	int log_head = 0;
+	int log_tail = 0;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -196,13 +198,12 @@ DAM marker values:
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-FdcType      g_FDC;
+static char*   g_pszVersion = {(char*)"0.1.4"};
+static FdcType g_FDC;
+
 FdcDriveType g_dtDives[MAX_DRIVES];
-
-static char* g_pszVersion = {(char*)"0.1.3"};
-
-TrackType   g_tdTrack;
-SectorType  g_stSector;
+TrackType    g_tdTrack;
+SectorType   g_stSector;
 
 static char        g_szBootConfig[80];
 
@@ -1208,7 +1209,6 @@ void FdcReadSector(int nDriveSel, int nSide, int nTrack, int nSector)
 	switch (g_dtDives[nDrive].nDriveFormat)
 	{
 		case eDMK:
-			// if (g_FDC.byDoublerEnable && (g_tdTrack.byDensity == eDD))
 			if (g_tdTrack.byDensity == eDD)
 			{
 				FdcReadDmkSector1791(nDriveSel, nSide, nTrack, nSector);
@@ -3381,34 +3381,28 @@ void __not_in_flash_func(fdc_write_sector)(byte byData)
 	{
 		if (byData >= 0xE0)
 		{
-			g_FDC.byDoublerPrecomp = 1;
 			g_FDC.byDoublerType = eRsDoubler;
 		}
 		else if (byData >= 0xC0)
 		{
-			g_FDC.byDoublerPrecomp = 0;
 			g_FDC.byDoublerType = eRsDoubler;
 		}
 		else if (byData >= 0xA0)
 		{
-			g_FDC.byDoublerEnable  = 0;
 			g_FDC.byDoublerDensity = 0;
 			g_FDC.byDoublerType = eRsDoubler;
 		}
 		else if (byData >= 0x80)
 		{
-			g_FDC.byDoublerEnable  = 1;
 			g_FDC.byDoublerDensity = 1;
 			g_FDC.byDoublerType = eRsDoubler;
 		}
 		else if (byData >= 0x60)
 		{
-			g_FDC.byDoublerSide = 1;
 			g_FDC.byDoublerType = eRsDoubler;
 		}
 		else if (byData >= 0x40)
 		{
-			g_FDC.byDoublerSide = 0;
 			g_FDC.byDoublerType = eRsDoubler;
 		}
 	}

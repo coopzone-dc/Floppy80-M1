@@ -331,10 +331,7 @@ typedef struct {
 	int   nDataSize;
 
 	BYTE  byDoublerType;
-	BYTE  byDoublerEnable;
-	BYTE  byDoublerSide;
 	BYTE  byDoublerDensity;
-	BYTE  byDoublerPrecomp;
 
 	BYTE  byCrcError;
 	BYTE  byReadData;
