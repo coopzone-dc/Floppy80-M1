@@ -40,6 +40,7 @@ start:
 	ld	(RESPONSE_ADDR+1),a
 	ld	(REQUEST_ADDR),a
 	ld	(REQUEST_ADDR+1),a
+	ld	(hidesel),a
 
 	; detect model (0=Model 3; 1=Model 4;)
 	ld	a,(000ah)	; Model 4?
@@ -132,6 +133,8 @@ gotid6:
 	jr	nz,gotid7
 	ld	a,FINDALL_CMD	; find .*
 	ld	(opcode),a
+	ld	a,1
+	ld	(hidesel),a
 	jp	getlist
 
 gotid7:
@@ -405,10 +408,10 @@ getlist20:
 	; display file name
 	push	bc
 
-	; if (opcode == FINDALL_CMD) then don't display the select character
-	ld	a,(opcode)
-	cp	FINDALL_CMD
-	jr	z,getlist21
+	; if (hidesel) then don't display the select character
+	ld	a,(hidesel)
+	cp	0
+	jr	nz,getlist21
 
 	ld	a,(found)
 	add	a,'0'
@@ -468,10 +471,10 @@ getlist30:
 
 	; if here then we have at least one entry
 
-	; if (opcode == FINDALL_CMD) then display press any key for next set of files
-	ld	a,(opcode)
-	cp	FINDALL_CMD
-	jr	z,getlist31
+	; if (hidesel) then display press any key for next set of files
+	ld	a,(hidesel)
+	cp	0
+	jr	nz,getlist31
 
 	; else continue as normal
 	jp	getlist32
@@ -553,10 +556,11 @@ mount2:	ld	(parm3),a
 	cp	FINDFMT_CMD
 	jr	z,do_format
 
-	ld	a,(opcode)
-	cp	FINDALL_CMD
-	jr	z,getlist40
+	ld	a,(hidesel)
+	cp	0
+	jr	nz,getlist40
 
+	; if here we assume it is a mount file request
 	call	mountfile
 	jp	getsta
 
@@ -1246,7 +1250,7 @@ exit:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 intro:
-		ascii	'Model I FDC utility version 0.1.0',13
+		ascii	'Model I FDC utility version 0.1.1',13
 		ascii	'Command line options:',13
 		ascii	'STA - get status (firmware version, mounted disks, etc.).',13
 ;		ascii	'SET - set FDC date and time to the TRS-80 date and time.',13
@@ -1256,14 +1260,19 @@ intro:
 		ascii	'DMK - mount a DMK disk image.         FDC DMK filename.ext n',13
 		ascii	'FOR - format DMK disk image.',13
 ;		ascii	'HFE - mount a HFE disk image.         FDC HFE filename.ext n',13
-		ascii   'IMP - import a file from the SD-Card. FDC IMP filename/ext:n',13
+		ascii   'IMP - import a file from the SD-Card. FDC IMP filename.ext:n',13
 ;		ascii	'EXP - export a file to the SD-card.   FDC EXP filename/ext:n',13
 		ascii	' ',13
 		ascii	'      filename.ext - is the filename and extension.',13
 		ascii	'      n - is the drive number (0-2).',13,0
 
 error1:		ascii	'Error: drive index not specified on command line',13,13,0
-imperr1:	ascii	'Error: invalid file specification',13,13,0
+imperr1:	ascii	'Error: invalid file specification',13
+		ascii	'Usage: FDC IMP filename.ext:n',13
+		ascii	'Where:',13
+		ascii   ' - filename.ext is the file name and extension of',13
+		ascii   '   the file to be imported from the SD-Card.',13
+		ascii   ' - n is the logical drive to save file on',13,13,0
 imperr2:	ascii	'Error: unable to open the specified file',13,13,0
 
 cscr:		ascii   ' ', 28, 31, 15, 0
@@ -1290,6 +1299,7 @@ prompt_next:	ascii	'Press any key for next set of files.',13,0
 
 model:		defs	1		; 0=Model 3; 1=Model 4; 2=Model II;
 opcode:		defs	1		; command line operation requested (0=STA; 1=INI; 2=MNT;)
+hidesel:	defs	1
 found:		defs	1
 select:		defs	1
 drive:		defs	1
