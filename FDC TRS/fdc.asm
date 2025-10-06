@@ -1,5 +1,5 @@
 ;
-; fdc.asm -- Floppy-80 Utility
+; fdc.asm -- M1 Floppy-80 Utility
 ;
 
 LLEN	 equ 80		; file buffer line length
@@ -42,20 +42,6 @@ start:
 	ld	(REQUEST_ADDR+1),a
 	ld	(hidesel),a
 
-	; detect model (0=Model 3; 1=Model 4;)
-	ld	a,(000ah)	; Model 4?
-	cp	40h
-	jr	z,not4
-
-	ld	a,1
-	ld	(model),a
-	jp	gotid
-
-not4:
-	ld	a,0
-	ld	(model),a
-
-gotid:
 	call	getparms
 
 	ld	a,0		; set opcode = 0 just in case
@@ -476,8 +462,8 @@ getlist30:
 	cp	0
 	jr	nz,getlist31
 
-	; else continue as normal
-	jp	getlist32
+	; else get selection from user
+	jp	sel_item
 getlist31:
 
 	ld	hl,prompt_next
@@ -485,7 +471,9 @@ getlist31:
 	call	getchar
 	jp	getnextset
 
-getlist32:
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; now that we have a list if files, get file selection from user
+sel_item:
 	; initialize drive selection to '0'
 	ld	a,'0'
 	ld	(drive),a
@@ -517,36 +505,37 @@ getlist32:
 	ld	b,a		; b = highest available selection
 	ld	a,(select)	; a = user input
 	cp	a,b
-	jr	c,mount
-	jr	z,mount
+	jr	c,sel_item10
+	jr	z,sel_item10
 	jp	getnextset
 
-	; else try to mount selected image
-mount:
-	; if (opcode == FINDINI_CMD) then don't ask user for drive index
-	ld	a,(opcode)
-	cp	FINDINI_CMD
-	jr	z,mount2
+sel_item10:
+	; if (hidesel) then don't ask user for drive index
+	ld	a,(hidesel)
+	cp	0
+	jr	nz,sel_item30
 
 	; if here then we need to ask user for drive index
 	ld	hl,prompt_drive
 	call	print
 
-mount1:	call	getchar
+sel_item20:
+	call	getchar
 	ld	(drive),a	; save copy of drive
 
 	; validate drive selection
 	; if (a < '0') then try again
 	cp	a,'0'
-	jr	c,mount1
+	jr	c,sel_item20
 
 	; if (a > '2') then try again
 	cp	'2'
-	jr	c,mount2	; A was less than '2'
-	jr	z,mount2	; A was exactly equal to '2'
-	jp	mount1
+	jr	c,sel_item30	; A was less than '2'
+	jr	z,sel_item30	; A was exactly equal to '2'
+	jp	sel_item20
 
-mount2:	ld	(parm3),a
+sel_item30:
+	ld	(parm3),a
 	ld	a,0
 	ld	(parm3+1),a
 
@@ -558,7 +547,7 @@ mount2:	ld	(parm3),a
 
 	ld	a,(hidesel)
 	cp	0
-	jr	nz,getlist40
+	jr	nz,sel_item40
 
 	; if here we assume it is a mount file request
 	call	mountfile
@@ -567,7 +556,7 @@ mount2:	ld	(parm3),a
 do_format:
 	call	format
 
-getlist40:
+sel_item40:
 	jp	exit
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1297,7 +1286,6 @@ prompt_reset:	ascii	'Power OFF and back ON to continue.',13,0
 
 prompt_next:	ascii	'Press any key for next set of files.',13,0
 
-model:		defs	1		; 0=Model 3; 1=Model 4; 2=Model II;
 opcode:		defs	1		; command line operation requested (0=STA; 1=INI; 2=MNT;)
 hidesel:	defs	1
 found:		defs	1
