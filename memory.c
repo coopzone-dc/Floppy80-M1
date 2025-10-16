@@ -13,6 +13,7 @@
 
 static byte by_memory[0x8000];
 
+volatile byte g_byFdcIntrActive;
 volatile byte g_byRtcIntrActive;
 volatile byte g_byResetActive;
 volatile byte g_byEnableIntr;
@@ -115,6 +116,16 @@ void __not_in_flash_func(ServiceFdcDriveSelectOperation)(void)
     {
         data = fdc_read_drive_select();
         FinishReadOperation(data);
+
+        if (data & 0x80)
+        {
+            if (!g_byFdcIntrActive) // then caused by RTC, so clear it
+            {
+                // deactivate intr
+                clr_gpio(INT_PIN);
+            }
+        }
+
         return;
     }
 

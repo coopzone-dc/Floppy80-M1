@@ -27,11 +27,7 @@
 	#define __not_in_flash_func(x) x
 #endif
 
-#ifdef ENABLE_LOGGING
-	LogType fdc_log[LOG_SIZE];
-	int log_head = 0;
-	int log_tail = 0;
-#endif
+#undef ENABLE_LOGGING
 
 ////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -253,7 +249,6 @@ volatile BYTE	g_byIntrRequest;		// controls the INTRQ output pin.  Which simulat
 	volatile byte     g_byEnableIntr;
 	volatile byte     g_bStopFdc;
 #else
-	volatile byte     g_byFdcIntrActive;
 	volatile int32_t  g_nRotationCount;
 	volatile uint32_t g_nMotorOnTimer;
 #endif
@@ -3745,12 +3740,6 @@ byte __not_in_flash_func(fdc_read_drive_select)(void)
 	{
 		g_byRtcIntrActive = false;
 		byRet |= 0x80;
-
-		if (!g_byFdcIntrActive) // then caused by RTC, so clear it
-		{
-			// deactivate intr
-			clr_gpio(INT_PIN);
-		}
 	}
 
 	return byRet;
