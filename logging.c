@@ -19,6 +19,7 @@ static int      g_nDriveSel = -1;
 static int      g_nCommand = -1;
 static int      g_nCommandType = -1;
 static int      g_nSectorSizes[] = {256, 512, 1024, 128};
+static uint8_t  g_byPrevHdcStatus = 0;
 
 LogType fdc_log[LOG_SIZE];
 int log_head = 0;
@@ -303,6 +304,8 @@ void ServicePortOutLog(void)
     char buf[64];
 	char t[8];
 
+	g_byPrevHdcStatus = 0;
+
 	switch (fdc_log[log_tail].op1)
 	{
 		case 0xC1: // Hard disk controller board control register (Read/Write).
@@ -444,15 +447,18 @@ void ServicePortOutLog(void)
 
 void ServicePortInLog(void)
 {
-	static BYTE byPrevStatus = 0;
     char buf[64];
 	char t[8];
+
+	if (fdc_log[log_tail].op1 != 0xCF)
+	{
+		g_byPrevHdcStatus = 0;
+	}
 
 	switch (fdc_log[log_tail].op1)
 	{
 		case 0xC1: // Hard disk controller board control register (Read/Write).
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X ", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -463,7 +469,6 @@ void ServicePortInLog(void)
 			break;
 
 		case 0xC8: // Data Register
-			byPrevStatus = 0;
             if (g_byRwIndex == 0)
             {
                 sprintf_s(g_szRwBuf, sizeof(g_szRwBuf)-1, "INP DATA %02X", fdc_log[log_tail].val);
@@ -495,7 +500,6 @@ void ServicePortInLog(void)
 
 		case 0xC9: // Hard Disk Write Pre-Comp Cyl.
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (Error Register)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -507,7 +511,6 @@ void ServicePortInLog(void)
 
 		case 0xCA: // Hard Disk Sector Count (Read/Write).
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (Sector Count)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -519,7 +522,6 @@ void ServicePortInLog(void)
 
 		case 0xCB: // Hard Disk Sector Number (Read/Write).
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (Sector Number)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -531,7 +533,6 @@ void ServicePortInLog(void)
 
 		case 0xCC: // Hard Disk Cylinder LSB (Read/Write).
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (Cylinder LSB)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -543,7 +544,6 @@ void ServicePortInLog(void)
 
 		case 0xCD: // Hard Disk Cylinder MSB (Read/Write).
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (Cylinder MSB)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -555,7 +555,6 @@ void ServicePortInLog(void)
 
 		case 0xCE: // Hard Disk Sector Size / Drive # / Head # (Read/Write).
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (SDH)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");
@@ -568,7 +567,7 @@ void ServicePortInLog(void)
 		case 0xCF: // Command/Status Register for WD1010 Winchester Disk Controller Chip.
 			PurgeRwBuffer();
 
-            if (byPrevStatus != fdc_log[log_tail].val)
+            if (g_byPrevHdcStatus != fdc_log[log_tail].val)
 			{
 				sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X (Status Reg)", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 				#ifdef MFC
@@ -578,14 +577,13 @@ void ServicePortInLog(void)
 					puts(buf);
 				#endif
 
-				byPrevStatus = fdc_log[log_tail].val;
+				g_byPrevHdcStatus = fdc_log[log_tail].val;
 			}
 
 			break;
 
 		default:
             PurgeRwBuffer();
-			byPrevStatus = 0;
 			sprintf_s(buf, sizeof(buf)-1, "INP %02X %02X ", fdc_log[log_tail].op1, fdc_log[log_tail].val);
 			#ifdef MFC
 				strcat_s(buf2, sizeof(buf2)-1, "\r\n");

@@ -170,17 +170,6 @@ uint32_t HdcGetSectorOffset(void)
 }
 
 //-----------------------------------------------------------------------------
-void HdcServiceTestCommand(void)
-{
-}
-
-//-----------------------------------------------------------------------------
-void HdcServiceRestoreCommand(void)
-{
-	Hdc.byStatusRegister |= STATUS_MASK_SEEK_COMPLETE;
-}
-
-//-----------------------------------------------------------------------------
 void HdcDumpDisk(void)
 {
 	byte  byBuf[256];
@@ -220,30 +209,6 @@ void HdcDumpDisk(void)
 }
 
 //-----------------------------------------------------------------------------
-void HdcServiceReadSectorCommand(void)
-{
-	Hdc.nSectorSize = g_nSectorSizes[(Hdc.bySDH_Register >> 5) & 0x03];
-	Hdc.byDriveSel  = (Hdc.bySDH_Register >> 3) & 0x03;
-	Hdc.byHeadSel   = Hdc.bySDH_Register & 0x07;
-
-	Hdc.pbyReadPtr = Hdc.bySectorBuffer;
-	Hdc.nReadCount = Hdc.nSectorSize;
-
-	uint32_t nOffset = HdcGetSectorOffset();
-
-	FileSeek(g_fVhd, nOffset);
-	FileRead(g_fVhd, Hdc.bySectorBuffer, Hdc.nSectorSize);
-
-	Hdc.byStatusRegister |= STATUS_MASK_DATA_REQUEST;
-}
-
-//-----------------------------------------------------------------------------
-void HdcServiceSeekCommand(void)
-{
-	Hdc.byStatusRegister |= STATUS_MASK_SEEK_COMPLETE;
-}
-
-//-----------------------------------------------------------------------------
 void ProcessActiveCommand(void)
 {
 	uint32_t nOffset, i;
@@ -263,32 +228,88 @@ void ProcessActiveCommand(void)
 			FileFlush(g_fVhd);
 
 			Hdc.byActiveCommand = 0;
+			Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
 			break;
 
-		case 0x05: // Format Track
-			if (Hdc.nWriteCount > 0)
-			{
-				break;
-			}
+		// case 0x05: // Format Track
+		// 	if (Hdc.nWriteCount > 0)
+		// 	{
+		// 		break;
+		// 	}
 
-			nOffset = HdcGetSectorOffset();
+		// 	nOffset = HdcGetSectorOffset();
 
-			FileSeek(g_fVhd, nOffset);
+		// 	FileSeek(g_fVhd, nOffset);
 
-			for (i = 0; i < Hdc.bySectorCountRegister; ++i)
-			{
-				FileWrite(g_fVhd, Hdc.bySectorBuffer, Hdc.nSectorSize);
-			}
+		// 	while (Hdc.bySectorCountRegister > 0)
+		// 	{
+		// 		FileWrite(g_fVhd, Hdc.bySectorBuffer, Hdc.nSectorSize);
+		// 		--Hdc.bySectorCountRegister;
+		// 	}
 
-			FileFlush(g_fVhd);
+		// 	FileFlush(g_fVhd);
 
-			Hdc.byActiveCommand = 0;
-			break;
+		// 	Hdc.byActiveCommand = 0;
+		// 	break;
 
 		default:
 			Hdc.byActiveCommand = 0;
 			break;
 	}
+}
+
+//-----------------------------------------------------------------------------
+void HdcServiceRestoreCommand(void)
+{
+	Hdc.byStatusRegister |= STATUS_MASK_SEEK_COMPLETE;
+	Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
+}
+
+//-----------------------------------------------------------------------------
+void HdcServiceReadSectorCommand(void)
+{
+	Hdc.nSectorSize = g_nSectorSizes[(Hdc.bySDH_Register >> 5) & 0x03];
+	Hdc.byDriveSel  = (Hdc.bySDH_Register >> 3) & 0x03;
+	Hdc.byHeadSel   = Hdc.bySDH_Register & 0x07;
+
+	Hdc.pbyReadPtr = Hdc.bySectorBuffer;
+	Hdc.nReadCount = Hdc.nSectorSize;
+
+	uint32_t nOffset = HdcGetSectorOffset();
+
+	FileSeek(g_fVhd, nOffset);
+	FileRead(g_fVhd, Hdc.bySectorBuffer, Hdc.nSectorSize);
+
+	Hdc.byStatusRegister |= STATUS_MASK_DATA_REQUEST;
+	Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
+}
+
+//-----------------------------------------------------------------------------
+void HdcServiceWriteSectorCommand(void)
+{
+	Hdc.byActiveCommand = Hdc.byCommandRegister;
+	// Hdc.byStatusRegister |= STATUS_MASK_DATA_REQUEST;
+}
+
+//-----------------------------------------------------------------------------
+void HdcServiceFormatCommand(void)
+{
+	// Hdc.byActiveCommand = Hdc.byCommandRegister;
+	// Hdc.byStatusRegister |= STATUS_MASK_DATA_REQUEST;
+	Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
+}
+
+//-----------------------------------------------------------------------------
+void HdcServiceSeekCommand(void)
+{
+	Hdc.byStatusRegister |= STATUS_MASK_SEEK_COMPLETE;
+	Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
+}
+
+//-----------------------------------------------------------------------------
+void HdcServiceTestCommand(void)
+{
+	Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
 }
 
 //-----------------------------------------------------------------------------
@@ -316,11 +337,11 @@ void HdcServiceStateMachine(void)
 			break;
 
 		case 0x03: // Write Sector
-			Hdc.byActiveCommand = Hdc.byCommandRegister;
+			HdcServiceWriteSectorCommand();
 			break;
 
 		case 0x05: // Format Track
-			Hdc.byActiveCommand = Hdc.byCommandRegister;
+			HdcServiceFormatCommand();
 			break;
 
 		case 0x07: // Seek
@@ -332,6 +353,7 @@ void HdcServiceStateMachine(void)
 			break;
 
 		default:
+			Hdc.byStatusRegister &= ~STATUS_MASK_BUSY;
 			break;
 	}
 
@@ -400,12 +422,20 @@ void __not_in_flash_func(hdc_port_out)(word addr, byte data)
 			break;
 
 		case 0xCF: // Command Register for WD1010 Winchester Disk Controller Chip.
-			Hdc.pbyWritePtr = Hdc.bySectorBuffer;
-			Hdc.nWriteCount = Hdc.nSectorSize;
 			Hdc.byActiveCommand = 0;
 			Hdc.byCommandRegister = data;
 			Hdc.byInterruptRequest = 0;
 			Hdc.byStatusRegister &= ~STATUS_MASK_DATA_REQUEST;
+			Hdc.byStatusRegister |= STATUS_MASK_BUSY;
+
+			data = data >> 4;
+
+			if ((data == 0x05) || (data == 0x03))
+			{
+				Hdc.pbyWritePtr = Hdc.bySectorBuffer;
+				Hdc.nWriteCount = Hdc.nSectorSize;
+			}
+
 			break;
 	}
 }

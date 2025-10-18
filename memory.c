@@ -359,10 +359,12 @@ void __not_in_flash_func(service_memory)(void)
 
         if (!get_gpio(IN_PIN))
         {
+            set_gpio(WAIT_PIN);
             ServicePortIn(addr.w);
         }
         else if (!get_gpio(OUT_PIN))
         {
+            set_gpio(WAIT_PIN);
             ServicePortOut(addr.w);
         }
         else if (addr.w >= 0x8000)
