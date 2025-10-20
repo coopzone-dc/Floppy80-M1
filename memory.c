@@ -113,12 +113,20 @@ void __not_in_flash_func(ServiceFdcDriveSelectOperation)(void)
     
     if (!get_gpio(RD_PIN))
     {
-        data = fdc_read_drive_select();
+        data = g_byDriveStatus;
+
+        if (g_byRtcIntrActive)
+        {
+            data |= 0x80;
+        }
+
         FinishReadOperation(data);
 
-        if (data & 0x80)
+        if (g_byRtcIntrActive)
         {
-            if (!g_byFdcIntrActive) // then caused by RTC, so clear it
+            g_byRtcIntrActive = false;
+
+            if (!g_byFdcIntrActive)
             {
                 // deactivate intr
                 clr_gpio(INT_PIN);
