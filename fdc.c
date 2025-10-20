@@ -2893,7 +2893,7 @@ void FdcProcessStatusRequest(byte print)
 	{
 		for (i = 0; i < MAX_DRIVES; ++i)
 		{
-			sprintf_s(szBuf, sizeof(szBuf)-1, "%d: ", i);
+			sprintf_s(szBuf, sizeof(szBuf)-1, "F%d: ", i);
 			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szBuf);
 			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, g_dtDives[i].szFileName);
 			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szLineEnd);
@@ -2901,7 +2901,7 @@ void FdcProcessStatusRequest(byte print)
 
 		for (i = 0; i < MAX_VHD_DRIVES; ++i)
 		{
-			sprintf_s(szBuf, sizeof(szBuf)-1, "%d: ", i+4);
+			sprintf_s(szBuf, sizeof(szBuf)-1, "H%d: ", i);
 			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szBuf);
 			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, Vhd[i].szFileName);
 			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szLineEnd);

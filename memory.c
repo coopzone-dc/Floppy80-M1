@@ -356,60 +356,68 @@ void __not_in_flash_func(service_memory)(void)
         addr.b[1] = get_gpio_data_byte();
         set_gpio(ADDRH_OE_PIN);
 
-        // set_gpio(WAIT_PIN);
+        set_gpio(WAIT_PIN);
 
-        if (!get_gpio(IN_PIN))
+        if (!get_gpio(MREQ_PIN))
         {
-            set_gpio(WAIT_PIN);
-            ServicePortIn(addr.w);
-        }
-        else if (!get_gpio(OUT_PIN))
-        {
-            set_gpio(WAIT_PIN);
-            ServicePortOut(addr.w);
-        }
-        else if (addr.w >= 0x8000)
-        {
-            ServiceHighMemoryOperation(addr.w);
-        }
-        else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF))
-        {
-            switch (addr.w)
+            if (addr.w >= 0x8000)
             {
-                case 0x37E0:
-                case 0x37E1:
-                case 0x37E2:
-                case 0x37E3:
-                    ServiceFdcDriveSelectOperation();
-                    break;
+                ServiceHighMemoryOperation(addr.w);
+            }
+            else if ((addr.w >= 0x37E0) && (addr.w <= 0x37EF))
+            {
+                switch (addr.w)
+                {
+                    case 0x37E0:
+                    case 0x37E1:
+                    case 0x37E2:
+                    case 0x37E3:
+                        ServiceFdcDriveSelectOperation();
+                        break;
 
-                case 0x37EC:
-                    ServiceFdcCmdStatusOperation();
-                    break;
+                    case 0x37EC:
+                        ServiceFdcCmdStatusOperation();
+                        break;
 
-                case 0x37ED:
-                    ServiceFdcTrackOperation();
-                    break;
+                    case 0x37ED:
+                        ServiceFdcTrackOperation();
+                        break;
 
-                case 0x37EE:
-                    ServiceFdcSectorOperation();
-                    break;
+                    case 0x37EE:
+                        ServiceFdcSectorOperation();
+                        break;
 
-                case 0x37EF:
-                    ServiceFdcDataOperation();
-                    break;
+                    case 0x37EF:
+                        ServiceFdcDataOperation();
+                        break;
+                }
+            }
+            else if ((addr.w >= FDC_REQUEST_ADDR_START) && (addr.w <= FDC_REQUEST_ADDR_STOP))
+            {
+                // set_gpio(WAIT_PIN);
+                ServiceFdcRequestOperation(addr.w);
+            }
+            else if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP))
+            {
+                // set_gpio(WAIT_PIN);
+                ServiceFdcResponseOperation(addr.w);
             }
         }
-        else if ((addr.w >= FDC_REQUEST_ADDR_START) && (addr.w <= FDC_REQUEST_ADDR_STOP))
+        else
         {
             set_gpio(WAIT_PIN);
-            ServiceFdcRequestOperation(addr.w);
+
+            if (!get_gpio(IN_PIN))
+            {
+                ServicePortIn(addr.w);
+            }
+            else
+            {
+                ServicePortOut(addr.w);
+            }
         }
-        else if ((addr.w >= FDC_RESPONSE_ADDR_START) && (addr.w <= FDC_RESPONSE_ADDR_STOP))
-        {
-            set_gpio(WAIT_PIN);
-            ServiceFdcResponseOperation(addr.w);
-        }
+
+
 
     	// end = systick_hw->cvr;
         // duration = (start & 0x00FFFFFF) - (end & 0x00FFFFFF);
