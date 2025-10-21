@@ -9,6 +9,8 @@
 	#include "sd_core.h"
 #endif
 
+#include "tusb.h"
+
 #include "defines.h"
 #include "file.h"
 #include "system.h"
@@ -106,16 +108,16 @@ void HdcInit(void)
 		{
 			Vhd[i].f = FileOpen(Vhd[i].szFileName, FA_OPEN_EXISTING | FA_READ | FA_WRITE);
 
-			memset(Vhd[i].byBuf, 0, sizeof(Vhd[i].byBuf));
+			memset(Vhd[i].byHeader, 0, sizeof(Vhd[i].byHeader));
 
 			if (Vhd[i].f != NULL)
 			{
-				FileRead(Vhd[i].f, Vhd[i].byBuf, sizeof(Vhd[i].byBuf));
+				FileRead(Vhd[i].f, Vhd[i].byHeader, sizeof(Vhd[i].byHeader));
 
-				Vhd[i].nHeads     = Vhd[i].byBuf[26];
-				Vhd[i].nCylinders = ((Vhd[i].byBuf[27] & 0x07) << 8) + Vhd[i].byBuf[28];
+				Vhd[i].nHeads     = Vhd[i].byHeader[26];
+				Vhd[i].nCylinders = ((Vhd[i].byHeader[27] & 0x07) << 8) + Vhd[i].byHeader[28];
 
-				nSectors = Vhd[i].byBuf[29];
+				nSectors = Vhd[i].byHeader[29];
 
 				if (nSectors == 0)
 				{
@@ -124,7 +126,7 @@ void HdcInit(void)
 
 				if (Vhd[i].nHeads == 0)
 				{
-					Vhd[i].nSectors = 32;
+					Vhd[i].nSectors = VHD_DEFAULT_SECTORS;
 					Vhd[i].nHeads   = nSectors / Vhd[i].nSectors;
 				}
 				else
@@ -184,7 +186,7 @@ void HdcCreateVhd(char* pszFileName, int nHeads, int nCylinders, int nSectors)
 		return;
 	}
 
-	FileWrite(f, Hdc.bySectorBuffer, 256);
+	FileWrite(f, Hdc.bySectorBuffer, VHD_HEADER_SIZE);
 	FileClose(f);
 
 	puts("Done");
@@ -202,37 +204,37 @@ uint32_t HdcGetSectorOffset(void)
 }
 
 //-----------------------------------------------------------------------------
-void HdcDumpDisk(void)
+void HdcDumpDisk(int nDrive)
 {
 	byte  byBuf[256];
 	byte* pby;
 	int   head = 0, cyl = 0, sec = 0;
 	int   i = 0, j = 0, k = 0;
 
-	if (Hdc.byDriveSel >= MAX_VHD_DRIVES)
+	if (nDrive >= MAX_VHD_DRIVES)
 	{
 		puts("Invalid drive index");
 		return;
 	}
 
-	if (Vhd[Hdc.byDriveSel].f == NULL)
+	if (Vhd[nDrive].f == NULL)
 	{
 		puts("Drive not mounted");
 		return;
 	}
 
-	FileSeek(Vhd[Hdc.byDriveSel].f, 256);
+	FileSeek(Vhd[nDrive].f, 256);
 
-	// for (head = 0; head < MAX_VHD_HEADS; ++head)
-	// {
-	// 	for (cyl = 0; cyl < MAX_VHD_CYLINDERS; ++cyl)
+	for (cyl = 0; cyl < Vhd[nDrive].nCylinders; ++cyl)
+	{
+		for (head = 0; head < Vhd[nDrive].nHeads; ++head)
 		{
-			for (sec = 0; sec < MAX_VHD_SECTORS_PER_CYLINDER; ++sec)
+			for (sec = 0; sec < Vhd[nDrive].nSectors; ++sec)
 			{
 				FileRead(Vhd[Hdc.byDriveSel].f, byBuf, sizeof(byBuf));
 			
                 printf("HEAD: %02X CYL: %02X SEC: %02X\r\n", head, cyl, sec);
-    	        // while (tud_cdc_write_available() < 56);
+    	        while (tud_cdc_write_available() < 56);
 
 				i = 0;
 
@@ -245,11 +247,11 @@ void HdcDumpDisk(void)
 					}
 
 					printf("\r\n");
+	    	        while (tud_cdc_write_available() < 56);
 				}
 			}
 		}
-	// }
-
+	}
 }
 
 //-----------------------------------------------------------------------------

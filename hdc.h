@@ -2,7 +2,9 @@
 #define MAX_VHD_DRIVES 2
 #define MAX_VHD_HEADS 4
 #define MAX_VHD_CYLINDERS 1024
-#define MAX_VHD_SECTORS_PER_CYLINDER 32
+
+#define VHD_HEADER_SIZE 256
+#define VHD_DEFAULT_SECTORS 32
 
 #define ERROR_MASK_DAM_NOT_FOUND      0x01
 #define ERROR_MASK_TR000              0x02
@@ -49,7 +51,7 @@ typedef struct {
 	file* f;
 	char  szFileName[128];
 
-	byte byBuf[256];
+	byte byHeader[VHD_HEADER_SIZE];
 	int  nHeads;
 	int  nCylinders;
 	int  nSectors;
@@ -62,6 +64,7 @@ void HdcInitFileName(int nDrive, char* pszFileName);
 void HdcInit(void);
 void HdcCreateVhd(char* pszFileName, int nHeads, int nCylinders, int nSectors);
 void HdcServiceStateMachine(void);
+void HdcDumpDisk(int nDrive);
 
 void hdc_port_out(word addr, byte data);
 byte hdc_port_in(word addr);

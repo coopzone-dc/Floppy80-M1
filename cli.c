@@ -177,13 +177,11 @@ void DumpSector(int nDrive, int nTrack, int nSector)
     sleep_ms(5);
 }
 
-void HdcDumpDisk(void);
-
 void ProcessDumpRequest(int nDrive)
 {
     if (nDrive == 4)
     {
-        HdcDumpDisk();
+        HdcDumpDisk(nDrive-4);
         return;
     }
 

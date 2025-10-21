@@ -324,7 +324,7 @@ void __not_in_flash_func(service_memory)(void)
 
         // wait for MREQ, IN, RD, WR and OUT to go inactive
         do {
-            bus = sio_hw->gpio_in >> IN_PIN;
+            bus = get_gpio_read_bus();
         } while ((bus & 0x1F) != 0x1F);
 
         // turn bus around
@@ -340,7 +340,7 @@ void __not_in_flash_func(service_memory)(void)
 
         // wait for MREQ, IN, RD, WR or OUT to go active, reading low address byte while waiting
         do {
-            bus = sio_hw->gpio_in >> IN_PIN;
+            bus = get_gpio_read_bus();
         } while ((bus & 0x1F) == 0x1F);
 
         addr = (bus >> (D0_PIN - IN_PIN)) & 0xFF;

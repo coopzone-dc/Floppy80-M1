@@ -114,6 +114,7 @@ typedef unsigned long      	dword;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define get_gpio_data_byte() (sio_hw->gpio_in >> D0_PIN)
+#define get_gpio_read_bus()  (sio_hw->gpio_in >> IN_PIN)
 #define get_gpio(gpio)       (sio_hw->gpio_in & (1u << gpio))
 #define set_gpio(gpio)        sio_hw->gpio_set = 1u << gpio
 #define clr_gpio(gpio)        sio_hw->gpio_clr = 1u << gpio
