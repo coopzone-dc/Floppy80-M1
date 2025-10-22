@@ -77,39 +77,14 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 	}
 	else if (g_nCommandType == 1)
 	{
-		// S0 (BUSY)
-		if (byStatus & F_BUSY)
+		// S7 (NOT READY) default to 0
+		if (byStatus & F_NOTREADY)
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
+			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
 		}
-		
-		// S1 (INDEX) default to 0
-		if (byStatus & F_INDEX)
+		else
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_INDEX|");
-		}
-
-		// S2 (TRACK 0) default to 0
-		if (byStatus & F_TRACK0)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_TRACK0|");
-		}
-
-		// S3 (CRC ERROR) default to 0
-		if (byStatus & F_CRCERR)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
-		}
-
-		// S4 (SEEK ERROR) default to 0
-		if (byStatus & F_SEEKERR)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_SEEKERR|");
-		}
-		
-		if (byStatus & F_HEADLOAD)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_HEADLOAD|");
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
 
 		// S6 (PROTECTED) default to 0
@@ -117,45 +92,84 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 		{
 			strcat_s(buf, nMaxLen, (char*)"F_PROTECTED|");
 		}
-		
-		// S7 (NOT READY) default to 0
-		if (byStatus & F_NOTREADY)
+		else
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
-	}
-	else if (((g_nCommand & 0xF0) == 0x80) || ((g_nCommand & 0xF0) == 0x90)) // Read Sector
-	{
+
+		// S5
+		if (byStatus & F_HEADLOAD)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_HEADLOAD|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S4 (SEEK ERROR) default to 0
+		if (byStatus & F_SEEKERR)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_SEEKERR|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S3 (CRC ERROR) default to 0
+		if (byStatus & F_CRCERR)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S2 (TRACK 0) default to 0
+		if (byStatus & F_TRACK0)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_TRACK0|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S1 (INDEX) default to 0
+		if (byStatus & F_INDEX)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_INDEX|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
 		// S0 (BUSY)
 		if (byStatus & F_BUSY)
 		{
 			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
 		}
-
-		// S1 (DATA REQUEST)     default to 0
-		if (byStatus & F_DRQ)
+		else
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+	}
+	else if (((g_nCommand & 0xF0) == 0x80) || ((g_nCommand & 0xF0) == 0x90)) // Read Sector
+	{
+		// S7 (NOT READY) default to 0
+		if (byStatus & F_NOTREADY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
 
-		// S2 (LOST DATA)        default to 0
-		if (byStatus & F_LOSTDATA)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
-		}
-
-		// S3 (CRC ERROR)        default to 0
-		if (byStatus & F_CRCERR)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
-		}
-
-		// S4 (RECORD NOT FOUND) default to 0
-		if (byStatus & F_NOTFOUND)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTFOUND|");
-		}
-
+		// S6/S5
 		if ((byStatus & 0x20) && (byStatus & 0x40))
 		{
 			strcat_s(buf, nMaxLen, (char*)"S6|S5|");
@@ -173,58 +187,14 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 			strcat_s(buf, nMaxLen, (char*)"-|-|");
 		}
 
-		// S7 (NOT READY) default to 0
-		if (byStatus & F_NOTREADY)
+		// S4 (RECORD NOT FOUND) default to 0
+		if (byStatus & F_NOTFOUND)
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
+			strcat_s(buf, nMaxLen, (char*)"F_NOTFOUND|");
 		}
-	}
-	else if ((g_nCommand & 0xFE) == 0xE4) // Read Track
-	{
-		// S0 (BUSY)
-		if (byStatus & F_BUSY)
+		else
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
-		}
-
-		// S1 (DATA REQUEST)     default to 0
-		if (byStatus & F_DRQ)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
-		}
-
-		// S2 (LOST DATA)        default to 0
-		if (byStatus & F_LOSTDATA)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
-		}
-
-		strcat_s(buf, nMaxLen, (char*)"-|-|-|-|");
-
-		// S7 (NOT READY) default to 0
-		if (byStatus & F_NOTREADY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
-		}
-	}
-	else if (((g_nCommand & 0xF0) == 0xA0) || ((g_nCommand & 0xF0) == 0xB0)) // Write Sector
-	{
-		// S0 (BUSY)
-		if (byStatus & F_BUSY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
-		}
-
-		// S1 (DATA REQUEST)     default to 0
-		if (byStatus & F_DRQ)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
-		}
-
-		// S2 (LOST DATA)        default to 0
-		if (byStatus & F_LOSTDATA)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
 
 		// S3 (CRC ERROR)        default to 0
@@ -232,43 +202,9 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 		{
 			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
 		}
-
-		// S4 (RECORD NOT FOUND) default to 0
-		if (byStatus & F_NOTFOUND)
+		else
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTFOUND|");
-		}
-		
-		// S5 (WRITER FAULT) default to 0
-		if (byStatus & F_WRFAULT)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_WRITE_FAULT|");
-		}
-
-		// S6 (PROTECTED) default to 0
-		if (byStatus & F_PROTECTED)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_PROTECTED|");
-		}
-
-		// S7 (NOT READY) default to 0
-		if (byStatus & F_NOTREADY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
-		}
-	}
-	else if ((g_nCommand == 0xF0) || (g_nCommand == 0xF4)) // Write Track
-	{
-		// S0 (BUSY)
-		if (byStatus & F_BUSY)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
-		}
-
-		// S1 (DATA REQUEST)     default to 0
-		if (byStatus & F_DRQ)
-		{
-			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
 
 		// S2 (LOST DATA)        default to 0
@@ -276,13 +212,85 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 		{
 			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
 		}
-
-		strcat_s(buf, nMaxLen, (char*)"-|-|");
-
-		// S5 (WRITER FAULT) default to 0
-		if (byStatus & F_WRFAULT)
+		else
 		{
-			strcat_s(buf, nMaxLen, (char*)"F_WRITE_FAULT|");
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S1 (DATA REQUEST)     default to 0
+		if (byStatus & F_DRQ)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S0 (BUSY)
+		if (byStatus & F_BUSY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+	}
+	else if ((g_nCommand & 0xFE) == 0xE4) // Read Track
+	{
+		// S7 (NOT READY) default to 0
+		if (byStatus & F_NOTREADY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		strcat_s(buf, nMaxLen, (char*)"-|-|-|-|");
+
+		// S2 (LOST DATA)        default to 0
+		if (byStatus & F_LOSTDATA)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S1 (DATA REQUEST)     default to 0
+		if (byStatus & F_DRQ)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S0 (BUSY)
+		if (byStatus & F_BUSY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+	}
+	else if (((g_nCommand & 0xF0) == 0xA0) || ((g_nCommand & 0xF0) == 0xB0)) // Write Sector
+	{
+		// S7 (NOT READY) default to 0
+		if (byStatus & F_NOTREADY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
 
 		// S6 (PROTECTED) default to 0
@@ -290,11 +298,134 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 		{
 			strcat_s(buf, nMaxLen, (char*)"F_PROTECTED|");
 		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
 
+		// S5 (WRITER FAULT) default to 0
+		if (byStatus & F_WRFAULT)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_WRITE_FAULT|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S4 (RECORD NOT FOUND) default to 0
+		if (byStatus & F_NOTFOUND)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_NOTFOUND|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S3 (CRC ERROR)        default to 0
+		if (byStatus & F_CRCERR)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_CRCERR|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S2 (LOST DATA)        default to 0
+		if (byStatus & F_LOSTDATA)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S1 (DATA REQUEST)     default to 0
+		if (byStatus & F_DRQ)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S0 (BUSY)
+		if (byStatus & F_BUSY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+	}
+	else if ((g_nCommand == 0xF0) || (g_nCommand == 0xF4)) // Write Track
+	{
 		// S7 (NOT READY) default to 0
 		if (byStatus & F_NOTREADY)
 		{
 			strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S6 (PROTECTED) default to 0
+		if (byStatus & F_PROTECTED)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_PROTECTED|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S5 (WRITER FAULT) default to 0
+		if (byStatus & F_WRFAULT)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_WRITE_FAULT|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S4/S3
+		strcat_s(buf, nMaxLen, (char*)"-|-|");
+
+		// S2 (LOST DATA)        default to 0
+		if (byStatus & F_LOSTDATA)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_LOSTDATA|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S1 (DATA REQUEST)     default to 0
+		if (byStatus & F_DRQ)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_DRQ|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
+		}
+
+		// S0 (BUSY)
+		if (byStatus & F_BUSY)
+		{
+			strcat_s(buf, nMaxLen, (char*)"F_BUSY|");
+		}
+		else
+		{
+			strcat_s(buf, nMaxLen, (char*)"-|");
 		}
 	}
 }
@@ -311,7 +442,7 @@ void PurgeFdcStatus(void)
 	}
 
 	fdc_get_status_string(buf, sizeof(buf)-1, g_byPrevFdcStatus);
-	sprintf_s(buf2, sizeof(buf2)-1, "RD STATUS %02X CMD TYPE %d (%s)", g_byPrevFdcStatus, g_nCommandType, buf);
+	sprintf_s(buf2, sizeof(buf2)-1, "RD STATUS %02X CMD TYPE %d (%s) x %d", g_byPrevFdcStatus, g_nCommandType, buf, g_nPrevFdcStatusCount);
 
 	#ifdef MFC
 		strcat_s(buf2, sizeof(buf2)-1, "\r\n");
