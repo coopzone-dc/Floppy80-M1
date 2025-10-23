@@ -489,6 +489,10 @@ void __not_in_flash_func(FdcUpdateStatus)(void)
 			byStatus |= F_NOTREADY;
 		}
 	}
+	else // Force Interrupt
+	{
+		byStatus = 0;
+	}
 	
 	g_FDC.byStatus = byStatus;
 }
@@ -1584,13 +1588,11 @@ void FdcProcessSeekCommand(void)
 
 	if (g_FDC.byCommandReg & 0x08) // h == 1?
 	{
-		// FdcSetFlag(eHeadLoaded);
-		g_FDC.status.byHeadLoaded = 1;
+		FdcSetFlag(eHeadLoaded);
 	}
 	else
 	{
-		// FdcClrFlag(eHeadLoaded);
-		g_FDC.status.byHeadLoaded = 0;
+		FdcClrFlag(eHeadLoaded);
 	}
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
@@ -1602,13 +1604,10 @@ void FdcProcessSeekCommand(void)
 
 	if (g_FDC.byData >= g_dtDives[nDrive].byNumTracks)
 	{
-		// FdcSetFlag(eSeekError);
-		g_FDC.status.bySeekError = 1;
-		// FdcClrFlag(eBusy);
-		g_FDC.status.byBusy = 0;
+		FdcSetFlag(eSeekError);
+		FdcClrFlag(eBusy);
 		g_FDC.nStateTimer = 0;
 		g_FDC.nProcessFunction = psSeek;
-		FdcUpdateStatus();
 		return;
 	}
 
@@ -1626,13 +1625,10 @@ void FdcProcessSeekCommand(void)
 	FdcReadTrack(nDrive, nSide, g_FDC.byData);
 
 	g_FDC.byTrack = g_FDC.byData;
-	// FdcClrFlag(eSeekError);
-	g_FDC.status.bySeekError = 0;
-	// FdcSetFlag(eBusy);
-	g_FDC.status.byBusy = 0;
+	FdcClrFlag(eSeekError);
+	FdcSetFlag(eBusy);
 	g_FDC.nStateTimer = 0;
 	g_FDC.nProcessFunction = psSeek;
-	FdcUpdateStatus();
 }
 
 //-----------------------------------------------------------------------------
@@ -2214,7 +2210,6 @@ void FdcProcessCommand(void)
 
 		case 1: // Seek										(Type 1 Command)
 			FdcProcessSeekCommand();
-			FdcUpdateStatus();
 			break;
 
 		case 2: // Step (don't update track register)		(Type 1 Command)
@@ -2869,52 +2864,31 @@ void FdcProcessStatusRequest(byte print)
 	strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, g_szBootConfig);
 	strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szLineEnd);
 
-	if (g_byBootConfigModified)
+	file* f;
+	int   nLen;
+
+	f = FileOpen(g_szBootConfig, FA_READ);
+	
+	if (f == NULL)
 	{
-		file* f;
-		int   nLen;
-
-		f = FileOpen(g_szBootConfig, FA_READ);
-		
-		if (f == NULL)
-		{
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, (char*)"Unable to open specified ini file");
-		}
-		else
-		{
-			nLen = FileReadLine(f, szBuf, sizeof(szBuf)-2);
-			
-			while (nLen >= 0)
-			{
-				if (nLen > 2)
-				{
-					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szBuf);
-					strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLineEnd);
-				}
-
-				nLen = FileReadLine(f, szBuf, sizeof(szBuf)-2);
-			}
-			
-			FileClose(f);
-		}
+		strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, (char*)"Unable to open specified ini file");
 	}
 	else
 	{
-		for (i = 0; i < MAX_DRIVES; ++i)
+		nLen = FileReadLine(f, szBuf, sizeof(szBuf)-2);
+		
+		while (nLen >= 0)
 		{
-			sprintf_s(szBuf, sizeof(szBuf)-1, "F%d: ", i);
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szBuf);
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, g_dtDives[i].szFileName);
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szLineEnd);
-		}
+			if (nLen > 2)
+			{
+				strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szBuf);
+				strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLineEnd);
+			}
 
-		for (i = 0; i < MAX_VHD_DRIVES; ++i)
-		{
-			sprintf_s(szBuf, sizeof(szBuf)-1, "H%d: ", i);
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szBuf);
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, Vhd[i].szFileName);
-			strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szLineEnd);
+			nLen = FileReadLine(f, szBuf, sizeof(szBuf)-2);
 		}
+		
+		FileClose(f);
 	}
 
 	if (print)

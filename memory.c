@@ -377,7 +377,7 @@ void __not_in_flash_func(service_memory)(void)
         {
             ServiceHighMemoryOperation(addr);
         }
-        else if ((addr >= 0x37E0) && (addr <= 0x37EF))
+        else
         {
             switch (addr)
             {
@@ -401,19 +401,23 @@ void __not_in_flash_func(service_memory)(void)
                     break;
 
                 case 0x37EF:
+                    set_gpio(WAIT_PIN);
                     ServiceFdcDataOperation();
                     break;
+
+                default:
+                    if ((addr >= FDC_REQUEST_ADDR_START) && (addr <= FDC_REQUEST_ADDR_STOP))
+                    {
+                        // set_gpio(WAIT_PIN);
+                        ServiceFdcRequestOperation(addr);
+                    }
+                    else if ((addr >= FDC_RESPONSE_ADDR_START) && (addr <= FDC_RESPONSE_ADDR_STOP))
+                    {
+                        // set_gpio(WAIT_PIN);
+                        ServiceFdcResponseOperation(addr);
+                    }
+                    break;
             }
-        }
-        else if ((addr >= FDC_REQUEST_ADDR_START) && (addr <= FDC_REQUEST_ADDR_STOP))
-        {
-            // set_gpio(WAIT_PIN);
-            ServiceFdcRequestOperation(addr);
-        }
-        else if ((addr >= FDC_RESPONSE_ADDR_START) && (addr <= FDC_RESPONSE_ADDR_STOP))
-        {
-            // set_gpio(WAIT_PIN);
-            ServiceFdcResponseOperation(addr);
         }
 
         // end = systick_hw->cvr;
