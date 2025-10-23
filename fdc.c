@@ -489,10 +489,6 @@ void __not_in_flash_func(FdcUpdateStatus)(void)
 			byStatus |= F_NOTREADY;
 		}
 	}
-	else // Force Interrupt
-	{
-		byStatus = 0;
-	}
 	
 	g_FDC.byStatus = byStatus;
 }
@@ -1588,11 +1584,13 @@ void FdcProcessSeekCommand(void)
 
 	if (g_FDC.byCommandReg & 0x08) // h == 1?
 	{
-		FdcSetFlag(eHeadLoaded);
+		// FdcSetFlag(eHeadLoaded);
+		g_FDC.status.byHeadLoaded = 1;
 	}
 	else
 	{
-		FdcClrFlag(eHeadLoaded);
+		// FdcClrFlag(eHeadLoaded);
+		g_FDC.status.byHeadLoaded = 0;
 	}
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
@@ -1604,10 +1602,13 @@ void FdcProcessSeekCommand(void)
 
 	if (g_FDC.byData >= g_dtDives[nDrive].byNumTracks)
 	{
-		FdcSetFlag(eSeekError);
-		FdcClrFlag(eBusy);
+		// FdcSetFlag(eSeekError);
+		g_FDC.status.bySeekError = 1;
+		// FdcClrFlag(eBusy);
+		g_FDC.status.byBusy = 0;
 		g_FDC.nStateTimer = 0;
 		g_FDC.nProcessFunction = psSeek;
+		FdcUpdateStatus();
 		return;
 	}
 
@@ -1625,10 +1626,13 @@ void FdcProcessSeekCommand(void)
 	FdcReadTrack(nDrive, nSide, g_FDC.byData);
 
 	g_FDC.byTrack = g_FDC.byData;
-	FdcClrFlag(eSeekError);
-	FdcSetFlag(eBusy);
+	// FdcClrFlag(eSeekError);
+	g_FDC.status.bySeekError = 0;
+	// FdcSetFlag(eBusy);
+	g_FDC.status.byBusy = 0;
 	g_FDC.nStateTimer = 0;
 	g_FDC.nProcessFunction = psSeek;
+	FdcUpdateStatus();
 }
 
 //-----------------------------------------------------------------------------
@@ -2210,6 +2214,7 @@ void FdcProcessCommand(void)
 
 		case 1: // Seek										(Type 1 Command)
 			FdcProcessSeekCommand();
+			FdcUpdateStatus();
 			break;
 
 		case 2: // Step (don't update track register)		(Type 1 Command)
@@ -3325,8 +3330,8 @@ void FdcRestore()
 
 			++g_FDC.nServiceState;
 
-			FdcClrFlag(eBusy);
 			g_FDC.byTrack = 0;
+			FdcClrFlag(eBusy);
 			FdcGenerateIntr();
 			g_FDC.nProcessFunction = psIdle;
 			break;
@@ -3423,57 +3428,11 @@ void __not_in_flash_func(fdc_write_cmd)(byte byData)
 		g_FDC.status.byBusy = 1;
 		g_FDC.byStatus      = F_BUSY;
 		g_FDC.byCommandReceived = 1;
-
-		if ((byData & 0xF0) == 0) // Restore command
-		{
-			if (byData & 0x08) // load head now
-			{
-				g_FDC.byStatus |= F_HEADLOAD;
-				g_FDC.status.byHeadLoaded = 1;
-			}
-		}
-		else if (byData == 0xF4)
-		{
-			g_nRotationCount = g_dwIndexTime + 1;
-			g_FDC.status.byIndex = 0;
-			g_FDC.byStatus  &= ~F_INDEX;
-		}
 	}
 
 #ifdef ENABLE_LOGGING
 	fdc_log[log_head].type = write_cmd;
 	fdc_log[log_head].val = byData;
-
-	if ((byData & 0xF0) == 0x10) // 0001xxxx
-	{
-		fdc_log[log_head].op1 = g_FDC.byData;
-		fdc_log[log_head].op2 = g_FDC.byTrack;
-	}
-	else if ((byData & 0xF0) == 0x80) // 1000xxxx
-	{
-		fdc_log[log_head].op1 = g_FDC.byTrack;
-		fdc_log[log_head].op2 = g_FDC.bySector;
-	}
-	else if ((byData & 0xF0) == 0xA0) // 1010xxxx
-	{
-		fdc_log[log_head].op1 = g_FDC.byTrack;
-		fdc_log[log_head].op2 = g_FDC.bySector;
-	}
-	else if ((byData & 0xFE) == 0xE4) // 1110010x
-	{
-		fdc_log[log_head].op1 = g_FDC.byTrack;
-	}
-	else if (byData == 0xF0) // 11110000
-	{
-		fdc_log[log_head].op1 = g_FDC.byDriveSel;
-		fdc_log[log_head].op2 = g_FDC.byTrack;
-	}
-	else if (byData == 0xF4) // 11110100
-	{
-		fdc_log[log_head].op1 = g_FDC.byDriveSel;
-		fdc_log[log_head].op2 = g_FDC.byTrack;
-	}
-
 	++log_head;
 	log_head = log_head % LOG_SIZE;
 #endif

@@ -159,7 +159,6 @@ typedef struct {
 	uint8_t type;
 	uint8_t val;
 	uint8_t op1;
-	uint8_t op2;
 } LogType;
 
 #define LOG_SIZE 4096
