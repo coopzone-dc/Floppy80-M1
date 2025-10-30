@@ -375,6 +375,7 @@ void __not_in_flash_func(service_memory)(void)
         }
         else if (addr >= 0x8000)
         {
+            set_gpio(WAIT_PIN);
             ServiceHighMemoryOperation(addr);
         }
         else
@@ -408,12 +409,12 @@ void __not_in_flash_func(service_memory)(void)
                 default:
                     if ((addr >= FDC_REQUEST_ADDR_START) && (addr <= FDC_REQUEST_ADDR_STOP))
                     {
-                        // set_gpio(WAIT_PIN);
+                        set_gpio(WAIT_PIN);
                         ServiceFdcRequestOperation(addr);
                     }
                     else if ((addr >= FDC_RESPONSE_ADDR_START) && (addr <= FDC_RESPONSE_ADDR_STOP))
                     {
-                        // set_gpio(WAIT_PIN);
+                        set_gpio(WAIT_PIN);
                         ServiceFdcResponseOperation(addr);
                     }
 
