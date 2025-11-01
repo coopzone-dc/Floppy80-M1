@@ -331,9 +331,9 @@ void __not_in_flash_func(FdcUpdateStatus)(void)
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
 
-	if ((nDrive < 0) || (g_dtDives[nDrive].f == NULL))
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
 	{
-		byStatus = F_NOTREADY | F_HEADLOAD;
+		byStatus = F_NOTREADY; // | F_HEADLOAD;
 	}
 	else if ((g_FDC.byCommandType == 1) || // Restore, Seek, Step, Step In, Step Out
              (g_FDC.byCommandType == 4))   // Force Interrupt
@@ -821,11 +821,6 @@ void FdcReadDmkTrack(int nDrive, int nSide, int nTrack)
 	g_tdTrack.nTrack     = nTrack;
 	g_tdTrack.nTrackSize = g_dtDives[nDrive].dmk.wTrackLength;
 
-	if (nDrive == 2)
-	{
-		nDrive = 2;
-	}
-
 	WORD  wIDAM   = FdcGetIDAM(0);
 	int   nOffset = wIDAM & 0x3FFF;
 	BYTE* pby = g_tdTrack.byTrackData + nOffset;
@@ -941,7 +936,7 @@ int FdcReadDmkSector1771(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 	
-	if (nDrive < 0)
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
 	{
 		return FDC_INVALID_DRIVE;
 	}
@@ -1074,7 +1069,7 @@ void FdcReadDmkSector1791(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 	
-	if (nDrive < 0)
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
 	{
 		return;
 	}
@@ -1156,7 +1151,7 @@ void FdcReadHfeSector(int nDriveSel, int nSide, int nTrack, int nSector)
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
 	
-	if (nDrive < 0)
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
 	{
 		return;
 	}
@@ -1201,6 +1196,11 @@ void FdcReadSector(int nDriveSel, int nSide, int nTrack, int nSector)
 	int nDrive;
 
 	nDrive = FdcGetDriveIndex(nDriveSel);
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
 
 	FdcReadTrack(nDrive, nSide, nTrack);
 
@@ -1517,6 +1517,11 @@ void FdcProcessRestoreCommand(void)
 	g_FDC.byCommandType = 1;
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
 
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
+
 	if (g_FDC.byCommandReg & 0x08) // h == 1?
 	{
 		FdcSetFlag(eHeadLoaded);
@@ -1596,6 +1601,13 @@ void FdcProcessSeekCommand(void)
 	}
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		FdcSetFlag(eNotReady);
+		FdcClrFlag(eBusy);
+		return;
+	}
 	
 	if (nDrive != g_tdTrack.nDrive)
 	{
@@ -1657,6 +1669,11 @@ void FdcProcessStepCommand(void)
 	}
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
 
 	if ((g_FDC.byCurCommand & 0x04) != 0) // perform verification
 	{
@@ -1731,6 +1748,11 @@ void FdcProcessStepInCommand(void)
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
 	
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
+
 	if (nDrive != g_tdTrack.nDrive)
 	{
 		g_tdTrack.nDrive = -1;
@@ -1794,6 +1816,11 @@ void FdcProcessStepOutCommand(void)
 
 	nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
 	
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
+
 	if (nDrive != g_tdTrack.nDrive)
 	{
 		g_tdTrack.nDrive = -1;
@@ -1826,6 +1853,11 @@ void FdcProcessReadSectorCommand(void)
 	int nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
 
 	g_FDC.byCommandType = 2;
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
 
 	FdcReadSector(g_FDC.byDriveSel, nSide, g_FDC.byTrack, g_FDC.bySector);
 
@@ -1899,6 +1931,11 @@ void FdcProcessWriteSectorCommand(void)
 	uint8_t address_mark_dd[] = {0xFB, 0xF8};
 
 	g_FDC.byCommandType = 2;
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
 
 	if (g_tdTrack.byDensity == eDD)
 	{
@@ -2009,6 +2046,12 @@ void FdcProcessReadTrackCommand(void)
 	int nDrive = FdcGetDriveIndex(g_FDC.byDriveSel);
 
 	g_FDC.byCommandType = 3;
+
+	if ((nDrive < 0) || (nDrive >= MAX_DRIVES) || (g_dtDives[nDrive].f == NULL))
+	{
+		return;
+	}
+
 	FdcSetFlag(eHeadLoaded);
 
 	g_tdTrack.nTrack = 255;

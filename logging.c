@@ -74,11 +74,12 @@ void fdc_get_status_string(char* buf, int nMaxLen, BYTE byStatus)
 	buf[0] = '|';
 	buf[1] = 0;
 
-	if ((nDrive < 0) || (g_dtDives[nDrive].f == NULL))
-	{
-		strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|F_HEADLOAD");
-	}
-	else if (g_nCommandType == 1)
+	// if ((nDrive < 0) || (g_dtDives[nDrive].f == NULL))
+	// {
+	// 	strcat_s(buf, nMaxLen, (char*)"F_NOTREADY|F_HEADLOAD");
+	// }
+	// else
+	if (g_nCommandType == 1)
 	{
 		// S7 (NOT READY) default to 0
 		if (byStatus & F_NOTREADY)
