@@ -77,8 +77,11 @@ FDC utility
   FDC STA
   - Displays the contects to the ini file specified by boot.cfg
 
-  FDC DIR
+  FDC DIR filter
   - Displays a list of files in the root folder of the SD-Card.
+    If filter is specified only files contain the filter character
+    sequence are displayed.  If filter is not specified all files
+    are displayed.
 
   FDC INI filename.exe
   - filename.exe is optional.  If not specified and list of ini files
