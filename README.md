@@ -134,15 +134,19 @@ Building Source
   
        zmac fdc.asm
      
-  3. Run TRS80GP loading the CP/M disk images.
+  2. Run TRS80GP loading the CP/M disk images.
      
        start trs80gp -m1 -vs -frehd -frehd_dir zout -turbo -mem 48 -d0 CPM141-0.dmk -d1 CPM141-1.dmk -d2 CPM141-2.dmk
      
-  5. Select Load from TRS80GP File menu and select the hex file.
-  6. Run "SAVE 20 B:FDC.COM" to save program memory contents to a .com file.
+  3. Select Load from TRS80GP File menu and select the hex file.
+  
+  4. Run "SAVE 20 B:FDC.COM" to save program memory contents to a .com file.
      As the program grows you will need to increase the value after SAVE.
 
      SAVE n ufn cr
+     
        n   - number of 256-byte pages to be saved.
+     
        ufn - unambiguous file name.
+     
        cr  - charage return.
