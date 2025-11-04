@@ -1,4 +1,5 @@
 ########################################################################
+
 Floppy 80 for the TRS-80 Model I
 
 The Floppy80-M1 emulates the following features of the Expansion Interface
@@ -39,6 +40,7 @@ vitual hard drive images
   They are used by the FreHD and TRS80-GP.
 
 ########################################################################
+
 FDC utility
 - Is a utility to interact with the Floppy80 from within the
   TRS-80 Model I operating environment.  Versions of FDC exist
@@ -115,6 +117,7 @@ FDC utility
     FAT32 formated SD-Card to the disk image indicated by n.
 
 ########################################################################
+
 Building Source
 - Floppy80 firmware
   - Uses VSCode and the Pi Pico extension.
