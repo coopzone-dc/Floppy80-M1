@@ -194,8 +194,6 @@ typedef struct {
 							//
 							// when 1 => data can be read/written;
 							//      0 => data is not available to be read/written;
-							//
-							// when enabled via the corresponding bit of byNmiMaskReg the WAIT output is the inverted state of byDataReq
 } FDC_StatusType;
 
 typedef struct {
@@ -285,22 +283,10 @@ typedef struct {
 	BYTE  byDriveSel;				// Bit 0 = drive select 1;
 									// Bit 1 = drive select 2;
 									// Bit 2 = drive select 3;
-									// Bit 3 = drive select 4;
-									// Bit 4 = 0 => side 0 select; 1 => side 1 select;
-									// Bit 5 = Write Precom (ignored);
-									// Bit 6 = 0 => do not generate wait; 1 => generate wait;
-									// Bit 7 = 0 => select FM mode; 1 => select MFM mode; (ignored)
+									// Bit 3 = drive side select;
+									// Bit 4 - 7 = unused on Model 1
 
 	BYTE  byBackupDriveSel;
-	
-	// RD when RDNMISTATUS is low
-	BYTE  byNmiStatusReg;
-
-	// WR when WRNMIMASKREG is low
-	BYTE  byNmiMaskReg;				// Bit 0 = host select; (see host interface communication protocol document for details)
-									// Bit 1..5 = not used;
-									// Bit 6 = the WAIT output is the inverted state of this bit.  This bit is cleared by activation of RESET, WAITTIMEOUT, INTRQ and DRQ
-									// Bit 7 = 0 => disable INTRQ; 1 => enable INTRQ;
 
 	BYTE  byRecordMark;
 							

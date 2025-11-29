@@ -241,8 +241,6 @@ volatile BYTE	g_byIntrRequest;		// controls the INTRQ output pin.  Which simulat
 										//
 										// when 1 => command has been completed;
 										//      0 => command can be written or that a command is in progress;
-										//
-										// when enabled via the corresponding bit of byNmiMaskReg the NMI output is the inverted state of byIntrReq
 
 #ifdef MFC
 	volatile int64_t  g_nRotationCount;
@@ -3719,11 +3717,8 @@ byte __not_in_flash_func(fdc_read)(uint16_t addr)
 // B0 - Drive select 1
 // B1 - Drive select 2
 // B2 - Drive select 3
-// B3 - Drive select 4
-// B4 - SDSEL   (0-selects side 0; 1-selects side 1)
-// B5 - PRECOMP (0-no write precompensation; 1-write precompensation enabled)
-// B6 - WSGEN   (0-disable wait state generation; 1-enable wait state generation)
-// B7 - FM/MFM  (0-select single density; 1-select double denisty)
+// B3 - Drive Side select
+// B4 - B7 Unused on Model 1
 void __not_in_flash_func(fdc_write_drive_select)(byte byData)
 {
 #ifdef ENABLE_LOGGING
