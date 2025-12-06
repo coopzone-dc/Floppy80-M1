@@ -10,7 +10,7 @@ the following features of the Expansion Interface
   - single and double-sided
   - up to 90 cylinders
   - DMK disk format supported
-A Hard Disk Controller
+- A Hard Disk Controller
   - supports up to 2 hard drives
   - Uses same image format as FreHD 
 - 32k RAM expansion (optional)
@@ -133,13 +133,14 @@ Displays a status, and the contents to the INI file specified by boot.cfg
 #### FDC DIR [fiter]
 
 Displays a list of files in the root folder of the SD-Card.
-If filter is specified only files contain the filter character sequence are displayed.  
+If filter is specified only files containing the filter character sequence are displayed.  
 If filter is not specified all files are displayed.
 
 #### FDC INI [filename.ini]
 
 Switches between the different INI file on the SD-Card. 
-If filename.ini is not specified a list of INI files on the SD-Card will be displayed allow you to select the one to write to boot.cfg
+If filename.ini is not specified a list of INI files on the SD-Card will be displayed 
+and you can select the one to write to boot.cfg
 
 #### FDC DMK [filename.dmk] [0/1/2]
 
