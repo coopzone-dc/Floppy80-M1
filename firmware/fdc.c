@@ -3297,6 +3297,7 @@ void FdcUpdateCounters(void)
 
 	if (g_nMotorOnTimer != 0)
 	{
+		g_dwLedCount   = LED_ON_TIME_MS;
 		g_byMotorWasOn = 1;
 
 		g_nMotorOnTimer   = CountDown(g_nMotorOnTimer, nDiff);
@@ -3311,18 +3312,14 @@ void FdcUpdateCounters(void)
 		if (g_nRotationCount < g_dwIndexTime)
 		{
 			FdcSetFlag(eIndex);
-		 	gpio_put(LED_PIN, 1);
 		}
 		else
 		{
 			FdcClrFlag(eIndex);
-		 	gpio_put(LED_PIN, 0);
 		}
 	}
 	else
 	{
-        gpio_put(LED_PIN, 1);
-
 		if (g_byMotorWasOn)
 		{
 			g_byMotorWasOn = 0;

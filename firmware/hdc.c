@@ -388,6 +388,8 @@ void HdcServiceStateMachine(void)
 		return;
 	}
 
+	g_dwLedCount = LED_ON_TIME_MS;
+
 	switch (Hdc.byCommandRegister >> 4)
 	{
 		case 0x01: // Restore

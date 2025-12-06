@@ -135,6 +135,8 @@ typedef unsigned long      	dword;
 // Low Power Timer Overflow Rates in Hz
 #define TIMER_OVERFLOW_RATE 2000
 
+#define LED_ON_TIME_MS      3000
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // generic defines/equates
 
@@ -212,14 +214,15 @@ enum {
 //-----------------------------------------------------------------------------
 // counter for real time clock (RTC).
 
-extern volatile uint8_t sd_byCardInialized;
-extern volatile byte    g_byFdcIntrActive;
-extern volatile byte    g_byRtcIntrActive;
-extern volatile byte    g_byResetActive;
-extern volatile byte    g_byEnableIntr;
-extern volatile int32_t g_nRotationCount;
-extern volatile byte    g_byEnableUpperMem;
-extern volatile byte    g_byEnableWaitStates;
+extern volatile uint8_t  sd_byCardInialized;
+extern volatile byte     g_byFdcIntrActive;
+extern volatile byte     g_byRtcIntrActive;
+extern volatile byte     g_byResetActive;
+extern volatile byte     g_byEnableIntr;
+extern volatile int32_t  g_nRotationCount;
+extern volatile byte     g_byEnableUpperMem;
+extern volatile byte     g_byEnableWaitStates;
+extern volatile uint32_t g_dwLedCount;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

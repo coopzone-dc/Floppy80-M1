@@ -23,6 +23,8 @@
 
 // Note: g_ (among other) prefix is used to denote global variables
 
+volatile uint32_t g_dwLedCount;
+
 //-----------------------------------------------------------------------------
 // counter for real time clock (RTC)
 
@@ -59,6 +61,7 @@ void InitVars(void)
 	g_byEnableIntr       = false;
 	g_byEnableUpperMem   = true;
 	g_byEnableWaitStates = false;
+	g_dwLedCount         = 0;
 
 	memset(&Hdc, 0, sizeof(Hdc));
 	memset(Vhd, 0, sizeof(Vhd));
@@ -349,6 +352,16 @@ void UpdateCounters(void)
 	{
 		g_dwResetCount   = 0;
 		g_byMonitorReset = TRUE;
+	}
+
+	if (g_dwLedCount > 0)
+	{
+		g_dwLedCount = CountDown(g_dwLedCount, nDiff);
+	 	gpio_put(LED_PIN, 0);
+	}
+	else
+	{
+	 	gpio_put(LED_PIN, 1);
 	}
 }
 
