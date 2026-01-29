@@ -4,53 +4,11 @@ You will need an existing disk0 image to boot from, with the RSHARD drivers on i
 
 You will also need to have a HDV hard disk image. The easy way to create the hard disk image is to use an emulator (trs80gp for example). The process for formatting the Hard disk is given below.
 
-Easy option, to get you up and running.
-
-1, You can use the pre-setup files in the ldosboothd.zip, unzip them to the SD-Card.
-2, Edit the boot.cfg file it should just contain the name of the ini file to boot, in this case ldosboothd.ini. Also check system.cfg has HDV=1 in it to enable HD.
-3, Boot the model 1 in the normal way, turn the floppy-80 M1 on first with the SD-Card in it. Then turn on the machine, it should boot LSDOS.
-
-The zip file contains
-ldosboot2s.dmk This is a double-sided single density floppy disk to boot the
-               system from. It also contains the RSHARD drivers v5 and v1.
-ldosboothd.hdv The hard disk image file, aprox 10meg, giving 4 2.5meg
-               partitions.
-ldosboothd.ini The ini file for floppy-80 M1 it set's up two devices:
-
-Your can test the setup with a few commands such as FREE or DEVICES, like this:
-                                                               
-LDOS Ready                                                      
-FREE                                                            
-Drive :0 BOOT2S   00/00/00  80S2 Free=  192.5/  400.0 Fi= 80/144
-Drive :4 HD04     01/28/26  38H8 Free= 2296.0/ 2432.0 Fi=254/256
-Drive :5 HD05     01/28/26  38H8 Free= 2360.0/ 2432.0 Fi=254/256
-Drive :6 HD06     01/28/26  38H8 Free= 2360.0/ 2432.0 Fi=254/256
-Drive :7 HD07     01/28/26  38H8 Free= 2360.0/ 2432.0 Fi=254/256
-                                                                
-LDOS Ready                                                      
-DEVICES                                                               
-:0   ↑BOOT2S  ← 5" Floppy #1 Cyl= 80 Sden Side=2 Step= 6 Dly= 1 
-:1   ↑No  Disk← 5" Floppy #2 Cyl= 35 Sden Side=1 Step=40 Dly= 1 
-:2   ↑No  Disk← 5" Floppy #4 Cyl= 35 Sden Side=1 Step=40 Dly= 1 
-:3   ↑No  Disk← 5" Floppy #8 Cyl= 35 Sden Side=1 Step=40 Dly= 1 
-:4   ↑HD04    ← 5" Rigid  #0 Cyl= 38 Fixed                      
-:5   ↑HD05    ← 5" Rigid  #0 Cyl= 38 Fixed                      
-:6   ↑HD06    ← 5" Rigid  #0 Cyl= 38 Fixed                      
-:7   ↑HD07    ← 5" Rigid  #0 Cyl= 38 Fixed                      
-*KI <=  X'03E3'                                                 
-*DO <=> X'4378'                                                 
-*PR  => X'058D'                                                 
-*JL  =  Nil                                                     
-*SI  =  Nil                                                     
-*SO  =  Nil                                                     
-Options: Slow
-
-
-To continue setting up manually:
+Setting up manually:
 
 There aren't many ways to create a hard disk image. In fact the only real way at present is to use the trs80gp emulator, the only other application I have seen was a utility called mkdisk from xtrs, but this seems to fail with buffer overflow errors. So to create the disk do the following:
 
-Start the emulator by setting the mode to Model 1, booting up an LD531 image, make sure you have the drivers on the boot disk. These are available on from Tim Mann’s site, look in the download section for RSHARD.
+Start the emulator. In setting choose Model 1, connect your disk image to drive 0 (LD531 image), make sure you have the drivers on the boot disk. These are available on from Tim Mann’s site, look in the download section for RSHARD.
 
 Create a new unformatted hdv disk in the hard disk menu. Then from LDOS use the commands bellow.
 
@@ -119,7 +77,9 @@ Repeat the format for partitions 5,6,7 (adjust Disk Pack Name)
 
 SYSTEM (SYSGEN)
 
-Done, your hard disk is ready to try in the floppy-80 M1. You may have noticed above I seem to have suggested strange sizes for the hard disk, I did this because the more normal, and original HD setup tracks=309, heads=4 etc always fail to work. I don't now if it's a bug in LDOS, RSHARD or perhaps the emulator... But if you try the default any partition created seems to only have 35 tracks when you come to format it. Even with the settings above the last portion could be 39 cylinders but it will fail to format more than 35 if you try it.
+Done, your hard disk is ready to try in the floppy-80 M1. 
+
+You may have noticed above I seem to have suggested strange sizes for the hard disk, I did this because the more normal, and original HD setup tracks=309, heads=4 etc always fail to work. I don't now if it's a bug in LDOS, RSHARD or perhaps the emulator... But if you try the default any partition created seems to only have 35 tracks when you come to format it. Even with the settings above the last portion could be 39 cylinders but it will fail to format more than 35 if you try it.
 
 To boot on the floppy-80 M1 use the following ini file:
 
@@ -129,4 +89,7 @@ Drive0=ldosboot2s.dmk
 HD0=ldosboothd.hdv
 
 And make sure HDV is enabled in system.cfg and boot.cfg should be set to use the correct ini file.
+New_docs_for_hd
+
+You should be able to use FREE and DEVICES to see the hard drive in the system.
 

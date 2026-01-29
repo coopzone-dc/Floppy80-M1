@@ -3,57 +3,6 @@ Some hints:
 
 Newdos80 v2.5 already has hard disk drivers built in. Creating partitions on a hard disk image (hdv file) is best done from an emulator for example trs80gp.
 
-But before you go through the manual process you also have the option to unzip a pre configured version, like this: (See further down for the manual steps)
-
-Unzip the newdos80hd.zip to the SD-Card
-
-Edit the boot.cfg file, it should just contain the name of the ini file to boot, in this case newdos80hd.ini. You also need to check system.cfg five to make sure it has HDV=1 to enable hard disk support.
-
-Boot the model 1 in the normal way, turn the floppy-80 M1 on first with the SD-Card in it. Then turn on the machine, it should boot NEWDOS80. Try a PDRIVE command for example or a DEVICES command:
-                                                     
-                                                                
-NEWDOS/80 READY                                                 
-PDRIVE,0                                                        
-0*  TI=A,TD=A,TC=35,SPT=10,TSR=3,GPL=2,DDSL=17,DDGA=2           
-1*  TI=A,TD=A,TC=35,SPT=10,TSR=3,GPL=2,DDSL=17,DDGA=2           
-2*  TI=A,TD=A,TC=35,SPT=10,TSR=3,GPL=2,DDSL=17,DDGA=2           
-3*  TI=A,TD=A,TC=35,SPT=10,TSR=3,GPL=2,DDSL=17,DDGA=2           
-4*  HDS=(0,306,0,4,32,0,0,9792,12,8,80,33)                      
-5*  HDS=(0,306,0,4,32,0,9792,9792,12,8,80,33)                   
-6*  HDS=(0,306,0,4,32,0,19584,9792,12,8,80,33)                  
-7*  HDS=(0,306,0,4,32,0,29376,9792,12,8,80,33)                  
-8   TI=C,TD=E,TC=40,SPT=18,TSR=3,GPL=2,DDSL=17,DDGA=2           
-9   TI=C,TD=G,TC=80,SPT=36,TSR=3,GPL=8,DDSL=17,DDGA=2           
-                                                                
-NEWDOS/80 READY                                                 FREE                                                            
-                                                                
-DRIVE   0  NEWDOS80  09/09/83   35 TRKS   28 FDES     7 GRANS   
-DRIVE   4  HD04      00/00/00    0 TRKS  212 FDES   770 GRANS   
-DRIVE   5  HD05      00/00/00    0 TRKS  246 FDES   812 GRANS   
-DRIVE   6  HD06      00/00/00    0 TRKS  246 FDES   812 GRANS   
-DRIVE   7  HD07      00/00/00    0 TRKS  246 FDES   812 GRANS   
-                                                                
-NEWDOS/80 READY                                                 
-_                                                               
-
-The files:
-
-newdos80hd.dmk This is a double-sided single density floppy disk to boot the
-               system from. It also contains the RSHARD drivers v5 and v1.
-newdos80hd.hdv The hard disk image file, aprox 10meg, giving 4 2.5meg
-               partitions.
-newdos80hd.ini The ini file for floppy-80 M1 it set's up two devices:
-
-Drive0=newdos80hd.dmk
-HD0=newdos80hd.hdv
-
-Drive0 the boot image and HD0 the hard disk image.
-
-You can test the setup using trs80gp -m1 -d0 newdos80hd.dmk -h0 newdos80hd.hdv
-
-
-
-
 Manual Steps
 
 Start the emulator with a newdos80 boot floppy. Create a new unformatted HDV hard disk image from the hard disk menu.
@@ -126,5 +75,13 @@ DRIVE   5  HD05      00/00/00    0 TRKS  246 FDES   812 GRANS
 DRIVE   6  HD06      00/00/00    0 TRKS  246 FDES   812 GRANS
 DRIVE   7  HD07      00/00/00    0 TRKS  246 FDES   812 GRANS
 
+Once you have created your hard disk image and floppy image. Copy them to the SD-Card and create an newdos80hd.ini file
+The ini file for floppy-80 M1 it set's up two devices:
+
+Drive0=newdos80hd.dmk
+HD0=newdos80hd.hdv
+
+You then need to edit boot.cfg to use the ini file created above.
+You should also check, if you have one, system.cfg to make sure HDV=1 is in use to enable the hard disk support.
 
 Done
