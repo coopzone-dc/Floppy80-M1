@@ -1,4 +1,3 @@
-
 Some hints:
 
 You will need an existing disk0 image to boot from, with the RSHARD drivers on it (see the RSHARD documentation). These can be found Tim Mann’s site. It's worth a good look at this site, the drivers are in the download section.
