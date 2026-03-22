@@ -10,6 +10,8 @@
 #include "file.h"
 #include "fdc.h"
 #include "hdc.h"
+#include "hardware/watchdog.h"
+#include "pico/bootrom.h"
 
 void ServiceFdcLog(void);
 
@@ -32,6 +34,8 @@ static bool    g_bOutputLog = false;
 static char szHelpText[] = {
                         "\n"
                         "help       - returns this message\n"
+                        "reboot     - reboot the floppy-80 firmware\n"
+                        "flash      - Reboot into BOOTSEL mode\n"
                         "status     - returns the current FDC status\n"
                         "dir filter - returns a directory listing of the root folder of the SD-Card\n"
                         "             optionally include a filter.  For example dir .ini\n"
@@ -40,7 +44,7 @@ static char szHelpText[] = {
                         "logoff     - disable output of FDC interface logging output\n"
                         "disks      - returns the stats to the mounted diskettes\n"
                         "dump drive - returns sectors of each track on the indicate drive (0 - 2)\n"
-                        "hdc        - creates a new vitual hard disk. Usage:\n"
+                        "hdc        - creates a new virtual hard disk. Usage:\n"
                         "             hdc file.ext heads cylinders sectors\n"
                     };
 
@@ -304,6 +308,18 @@ void ProcessCommand(char* psz)
         CreateHdcFile(psz);
         return;
     }
+
+    if (stricmp(szCmd, "REBOOT") == 0)
+    {
+        watchdog_reboot(0,0,0);
+        return;
+    }
+
+	if (stricmp(szCmd, "FLASH") == 0)
+	{
+		rom_reset_usb_boot(0,0);
+	    return;
+	}
 
     puts("Unknown command");
     puts(szHelpText);
