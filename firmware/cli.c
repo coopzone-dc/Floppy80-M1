@@ -76,7 +76,7 @@ void ListFiles(char* pszFilter)
 			{
                 ++nCol;
 
-    			if (nCol < 5)
+    			if (nCol < DIR_COLUMNS)
 				{
                     printf("%30s %9d", fno.fname, fno.fsize);
                 }
