@@ -2913,6 +2913,7 @@ void FdcProcessStatusRequest(byte print)
 	if (f == NULL)
 	{
 		strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, (char*)"Unable to open specified ini file");
+		strcat_s((char*)(g_bFdcResponse.buf), sizeof(g_bFdcResponse.buf)-1, szLineEnd);
 	}
 	else
 	{
@@ -2933,6 +2934,10 @@ void FdcProcessStatusRequest(byte print)
 	}
 
 	sprintf(szBuf, "MEM=%d", g_byEnableUpperMem);
+	strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szBuf);
+	strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLineEnd);
+
+	sprintf(szBuf, "VHD=%d", g_byEnableVhd);
 	strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szBuf);
 	strcat_s((char*)(g_bFdcResponse.buf),  sizeof(g_bFdcResponse.buf)-1, szLineEnd);
 
