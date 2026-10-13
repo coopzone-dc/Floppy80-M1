@@ -223,7 +223,8 @@ Some of the more important commands are described below
 
 ### Create Virtual Hard Disks
 
-**t.b.d.**
+See seperate folder harddisk for examples of using the hard disk emulator.
+
 
 ### Dump Drive Contents
 
