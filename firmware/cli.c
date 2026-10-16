@@ -11,6 +11,7 @@
 #include "fdc.h"
 #include "hdc.h"
 #include "hardware/watchdog.h"
+#include "hardware/clocks.h"
 #include "pico/bootrom.h"
 
 void ServiceFdcLog(void);
@@ -275,6 +276,8 @@ void ProcessCommand(char* psz)
     if (stricmp(szCmd, "STATUS") == 0)
     {
         FdcProcessStatusRequest(true);
+	printf("System clock: %lu MHz\n",
+        (unsigned long)(clock_get_hz(clk_sys) / 1000000));
         return;
     }
 

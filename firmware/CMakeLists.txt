@@ -23,7 +23,22 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pico2 CACHE STRING "Board type")
+#set(PICO_BOARD pico2 CACHE STRING "Board type")
+set(PICO_TARGET "PICO2" CACHE STRING "Target board: PICO or PICO2")
+set_property(CACHE PICO_TARGET PROPERTY STRINGS PICO PICO2)
+
+if(PICO_TARGET STREQUAL "PICO")
+	set(PICO_BOARD pico CACHE STRING "Board type" FORCE)
+	add_compile_definitions(TARGET_PICO=1)
+elseif(PICO_TARGET STREQUAL "PICO2")
+	set(PICO_BOARD pico2 CACHE STRING "Board type" FORCE)
+	add_compile_definitions(TARGET_PICO2=1)
+else()
+	message(FATAL_ERROR "Invalid PICO_TARGET='${PICO_TARGET}'. Use PICO or PICO2.")
+endif()
+
+message(STATUS "Building for ${PICO_BOARD} (${PICO_TARGET})")
+
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
